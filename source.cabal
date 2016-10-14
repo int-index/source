@@ -15,8 +15,8 @@ library
                        Source.User
                        Source.Util
 
-  build-depends:       base, containers, bytestring, cereal, text, network,
-                       lens, vty, enummapset-th, multiset, pretty-show, mtl
+  build-depends:       base, text, bytestring, cereal, containers, multiset,
+                       enummapset-th, mtl, lens
 
   default-language:    Haskell2010
   default-extensions:  BangPatterns
@@ -62,9 +62,8 @@ executable source-server
                        Source.Server.State
                        Source.Server.State.Client
 
-  build-depends:       base, containers, bytestring, cereal, text, network,
-                       lens, vty, enummapset-th, multiset, pretty-show, mtl,
-                       source
+  build-depends:       base, source, mtl, lens, enummapset-th, network,
+                       pretty-show
 
   default-language:    Haskell2010
   default-extensions:  BangPatterns
@@ -109,9 +108,7 @@ executable source-client
                        Source.Client.Render
                        Source.Client.State
 
-  build-depends:       base, containers, bytestring, cereal, text, network,
-                       lens, vty, enummapset-th, multiset, pretty-show, mtl,
-                       source
+  build-depends:       base, source, enummapset-th, lens, vty, network
 
   default-language:    Haskell2010
   default-extensions:  BangPatterns
