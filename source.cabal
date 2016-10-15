@@ -12,6 +12,7 @@ library
                        Source.Edit
                        Source.Protocol
                        Source.Protocol.Handle
+                       Source.Layout
                        Source.User
                        Source.Util
 
@@ -106,6 +107,7 @@ executable source-client
 
   other-modules:       Source.Client
                        Source.Client.Render
+                       Source.Client.Render.Layout
                        Source.Client.State
 
   build-depends:       base, source, enummapset-th, lens, vty, network
