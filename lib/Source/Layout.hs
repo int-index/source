@@ -5,6 +5,7 @@ module Source.Layout
   , Box(..)
   , boxA
   , boxB
+  , boxInside
   , Element(..)
   , elementBox
   , elementObject
@@ -19,12 +20,16 @@ module Source.Layout
   , layoutSingleton
   , layoutSuperimpose
   , layoutMove
-  , layoutResize
-  , layoutVertical
-  , boxPadLeft
-  , boxPadRight
-  , boxPadTop
-  , boxPadBottom
+  , layoutCompose
+  , layoutWidth
+  , layoutHeight
+  , layoutVerticalLeft
+  , layoutVerticalRight
+  , layoutHorizontalTop
+  , layoutPadLeft
+  , layoutPadRight
+  , layoutPadTop
+  , layoutPadBottom
   ) where
 
 import Control.Lens
@@ -38,6 +43,10 @@ data Point x y =
   deriving (Eq)
 
 makeLenses ''Point
+
+instance (Num x, Num y) => Monoid (Point x y) where
+  mempty = Point 0 0
+  mappend (Point x1 y1) (Point x2 y2) = Point (x1 + x2) (y1 + y2)
 
 data Box x y =
   Box {
@@ -57,12 +66,12 @@ makeLenses ''Element
 
 data Collage x y a =
   CollageElement (Box x y) a |
-  CollageMove (Box x y) (Endo (Point x y)) (Collage x y a) |
+  CollageMove (Box x y) (Point x y) (Collage x y a) |
   CollageSuperimpose (Box x y) (Collage x y a) (Collage x y a)
   deriving (Functor)
 
-boxMove :: (Point x y -> Point x y) -> Box x y -> Box x y
-boxMove move (Box a b) = Box (move a) (move b)
+boxMove :: Monoid (Point x y) => Point x y -> Box x y -> Box x y
+boxMove offset (Box a b) = Box (a <> offset) (b <> offset)
 
 boxSuperimpose :: (Ord x, Ord y) => Box x y -> Box x y -> Box x y
 boxSuperimpose (Box a1 b1) (Box a2 b2) =
@@ -70,6 +79,19 @@ boxSuperimpose (Box a1 b1) (Box a2 b2) =
   where
     pointMin (Point x1 y1) (Point x2 y2) = Point (min x1 x2) (min y1 y2)
     pointMax (Point x1 y1) (Point x2 y2) = Point (max x1 x2) (max y1 y2)
+
+boxInside :: (Ord x, Ord y) => Box x y -> Point x y -> Bool
+boxInside (Box (Point ax ay) (Point bx by)) (Point x y) =
+  x >= ax &&
+  x <= bx &&
+  y >= ay &&
+  y <= by
+
+boxWidth :: Num x => Box x y -> x
+boxWidth (Box (Point ax _) (Point bx _)) = bx - ax
+
+boxHeight :: Num y => Box x y -> y
+boxHeight (Box (Point _ ay) (Point _ by)) = by - ay
 
 elementDistribEither ::
   Element x y (Either a b) ->
@@ -88,28 +110,17 @@ collageBox = \case
   CollageMove box _ _ -> box
   CollageSuperimpose box _ _ -> box
 
-collageResize ::
-  (Box x y -> Box x y) ->
-  Collage x y a ->
-  Collage x y a
-collageResize resize = \case
-  CollageElement box a ->
-    CollageElement (resize box) a
-  CollageMove box move collage ->
-    CollageMove (resize box) move collage
-  CollageSuperimpose box collage1 collage2 ->
-    CollageSuperimpose (resize box) collage1 collage2
-
 collageElement :: Box x y -> a -> Collage x y a
 collageElement = CollageElement
 
 collageMove ::
-  (Point x y -> Point x y) ->
+  (Num x, Num y) =>
+  Point x y ->
   Collage x y a ->
   Collage x y a
-collageMove move collage = CollageMove box (Endo move) collage
+collageMove offset collage = CollageMove box offset collage
   where
-    box = boxMove move (collageBox collage)
+    box = boxMove offset (collageBox collage)
 
 collageSuperimpose ::
   (Ord x, Ord y) =>
@@ -122,22 +133,33 @@ collageSuperimpose collage1 collage2 =
     box = boxSuperimpose (collageBox collage1) (collageBox collage2)
 
 collageElements ::
+  (Num x, Num y) =>
   Collage x y a ->
   [Element x y a]
 collageElements collage = collageElements' mempty collage `appEndo` []
   where
-    collageElements'
-      :: Endo (Point x y)
-      -> Collage x y a
-      -> Endo [Element x y a]
-    collageElements' move = \case
+    collageElements' ::
+      (Num x, Num y) =>
+      Point x y ->
+      Collage x y a ->
+      Endo [Element x y a]
+    collageElements' offset = \case
       CollageElement box a ->
-        let box' = boxMove (appEndo move) box
+        let box' = boxMove offset box
         in Endo (Element box' a:)
-      CollageMove _ move' collage1 ->
-        collageElements' (move <> move') collage1
+      CollageMove _ offset' collage1 ->
+        collageElements' (offset <> offset') collage1
       CollageSuperimpose _ collage1 collage2 ->
-        collageElements' move collage1 <> collageElements' move collage2
+        collageElements' offset collage1 <> collageElements' offset collage2
+
+collageRebox ::
+  (Num x, Num y) =>
+  (Box x y -> Box x y) ->
+  Collage x y a ->
+  Collage x y a
+collageRebox rebox collage = CollageMove box mempty collage
+  where
+    box = rebox (collageBox collage)
 
 data Layout x y a = Layout ((a -> Box x y) -> Collage x y a)
   deriving (Functor)
@@ -160,44 +182,88 @@ layoutSuperimpose layout1 layout2 = Layout $ \getBox ->
     (layoutCollage getBox layout2)
 
 layoutMove ::
-  (Point x y -> Point x y) ->
+  (Num x, Num y) =>
+  Point x y ->
   Layout x y a ->
   Layout x y a
-layoutMove move layout = Layout $ \getBox ->
-  collageMove move (layoutCollage getBox layout)
+layoutMove offset layout = Layout $ \getBox ->
+  collageMove offset (layoutCollage getBox layout)
 
-layoutResize ::
+layoutCompose ::
+  (Ord x, Ord y, Num x, Num y) =>
+  (Box x y -> Box x y -> Point x y) ->
+  Layout x y a ->
+  Layout x y a ->
+  Layout x y a
+layoutCompose composer layout1 layout2 =
+  Layout $ \getBox ->
+    let
+      collage1 = layoutCollage getBox layout1
+      collage2 = layoutCollage getBox layout2
+      box1 = collageBox collage1
+      box2 = collageBox collage2
+      offset = composer box1 box2
+    in
+      collageSuperimpose collage1 (collageMove offset collage2)
+
+layoutWidth :: Num x => (a -> Box x y) -> Layout x y a -> x
+layoutWidth getBox layout = boxWidth box
+  where
+    box = collageBox collage
+    collage = layoutCollage getBox layout
+
+layoutHeight :: Num y => (a -> Box x y) -> Layout x y a -> y
+layoutHeight getBox layout = boxHeight box
+  where
+    box = collageBox collage
+    collage = layoutCollage getBox layout
+
+layoutVerticalLeft ::
+  (Ord x, Ord y, Num x, Num y) =>
+  Layout x y a ->
+  Layout x y a ->
+  Layout x y a
+layoutVerticalLeft = layoutCompose $
+  \(Box (Point x1 _) (Point _ y1)) ->
+  \(Box (Point x2 y2) _) ->
+    Point (x1 - x2) (y1 - y2)
+
+layoutVerticalRight ::
+  (Ord x, Ord y, Num x, Num y) =>
+  Layout x y a ->
+  Layout x y a ->
+  Layout x y a
+layoutVerticalRight = layoutCompose $
+  \(Box _ (Point x1 y1)) ->
+  \(Box (Point _ y2)(Point x2 _)) ->
+    Point (x1 - x2) (y1 - y2)
+
+layoutHorizontalTop ::
+  (Ord x, Ord y, Num x, Num y) =>
+  Layout x y a ->
+  Layout x y a ->
+  Layout x y a
+layoutHorizontalTop = layoutCompose $
+  \(Box (Point _ y1) (Point x1 _)) ->
+  \(Box (Point x2 y2) _) ->
+    Point (x1 - x2) (y1 - y2)
+
+layoutRebox ::
+  (Num x, Num y) =>
   (Box x y -> Box x y) ->
   Layout x y a ->
   Layout x y a
-layoutResize resize layout = Layout $ \getBox ->
-  collageResize resize (layoutCollage getBox layout)
+layoutRebox rebox layout = Layout $ \getBox ->
+  collageRebox rebox (layoutCollage getBox layout)
 
-layoutVertical ::
-  (Ord x, Ord y, Num y) =>
-  Layout x y a ->
-  Layout x y a ->
-  Layout x y a
-layoutVertical layout1 layout2 = Layout $ \getBox ->
-  let
-    collage1 = layoutCollage getBox layout1
-    collage2 = layoutCollage getBox layout2
-    Box _ (Point _ y1) = collageBox collage1
-    Box (Point _ y2) _ = collageBox collage2
-    move (Point x y) = Point x (y + y1 - y2)
-  in
-    collageSuperimpose collage1 (collageMove move collage2)
+layoutPadLeft :: (Num x, Num y) => x -> Layout x y a -> Layout x y a
+layoutPadLeft x = layoutRebox (boxA . pointX -~ x)
 
---
+layoutPadRight :: (Num x, Num y) => x -> Layout x y a -> Layout x y a
+layoutPadRight x = layoutRebox (boxB . pointX +~ x)
 
-boxPadLeft :: Num x => x -> Box x y -> Box x y
-boxPadLeft x (Box (Point ax ay) b) = Box (Point (ax-x) ay) b
+layoutPadTop :: (Num x, Num y) => y -> Layout x y a -> Layout x y a
+layoutPadTop y = layoutRebox (boxA . pointY -~ y)
 
-boxPadRight :: Num x => x -> Box x y -> Box x y
-boxPadRight x (Box a (Point bx by)) = Box a (Point (bx+x) by)
-
-boxPadTop :: Num y => y -> Box x y -> Box x y
-boxPadTop y (Box (Point ax ay) b) = Box (Point ax (ay-y)) b
-
-boxPadBottom :: Num y => y -> Box x y -> Box x y
-boxPadBottom y (Box a (Point bx by)) = Box a (Point bx (by+y))
+layoutPadBottom :: (Num x, Num y) => y -> Layout x y a -> Layout x y a
+layoutPadBottom y = layoutRebox (boxB . pointY +~ y)

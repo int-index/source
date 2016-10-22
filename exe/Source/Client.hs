@@ -17,8 +17,8 @@ import Source.Client.State
 import Source.Client.Render
 import Source.Util
 
-receiveMessages :: Chan Picture -> IORef ClientState -> Handle -> IO ()
-receiveMessages pictureChan clientStateRef handle = forever $ do
+receiveMessages :: Vty -> IORef ClientState -> Handle -> IO ()
+receiveMessages vty clientStateRef handle = forever $ do
   message <- hGetMessage handle
   case message of
     MessageModelPut nodes edges cursors ->
@@ -29,14 +29,15 @@ receiveMessages pictureChan clientStateRef handle = forever $ do
     MessageCursorAssign cursorId ->
       atomicRunStateIORef' clientStateRef $ do
         clientStateCursorId .= Just cursorId
-  pic <- readIORef clientStateRef <&> \clientState ->
-    renderModel
-      (EnableIdentifiersResolution True)
-      (clientState ^. clientStateLastEvent)
-      (clientState ^. clientStateNodes)
-      (clientState ^. clientStateEdges)
-      (clientState ^. clientStateCursors)
-  writeChan pictureChan pic
+  (picture, _ptrNodeId) <-
+    readIORef clientStateRef <&> \clientState ->
+      renderModel
+        (EnableIdentifiersResolution True)
+        (clientState ^. clientStateLastEvent)
+        (clientState ^. clientStateNodes)
+        (clientState ^. clientStateEdges)
+        (clientState ^. clientStateCursors)
+  Vty.update vty picture
 
 sendMessages :: IO Event -> IORef ClientState -> Handle -> IO ()
 sendMessages nextEvent' clientStateRef handle = do
@@ -53,11 +54,6 @@ sendMessages nextEvent' clientStateRef handle = do
       EvKey (KChar 'd') [MCtrl] -> exitSuccess
       _ -> hPutMessage handle MessageModelGet
 
-updateVtyPicture :: Vty -> Chan Vty.Picture -> IO ()
-updateVtyPicture vty pictureChan = forever $ do
-  picture <- readChan pictureChan
-  Vty.update vty picture
-
 withVty :: (Vty -> IO a) -> IO a
 withVty = bracket createVty Vty.shutdown
   where
@@ -67,15 +63,11 @@ withVty = bracket createVty Vty.shutdown
 
 runClient :: IO ()
 runClient = withVty $ \vty -> do
-  pictureChan <- newChan
-  updateVtyPictureThreadId <-
-    forkIO $ updateVtyPicture vty pictureChan
   clientStateRef <- newIORef clientStateEmpty
   handle <- connectTo "localhost" (PortNumber 50113)
   initHandle handle
   receiveMessagesThreadId <-
-    forkIO $ receiveMessages pictureChan clientStateRef handle
+    forkIO $ receiveMessages vty clientStateRef handle
   sendMessages (nextEvent vty) clientStateRef handle
     `finally` do
       killThread receiveMessagesThreadId
-      killThread updateVtyPictureThreadId
