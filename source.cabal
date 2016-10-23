@@ -34,6 +34,7 @@ library
                        LambdaCase
                        MultiParamTypeClasses
                        MultiWayIf
+                       OverloadedStrings
                        PatternSynonyms
                        PolyKinds
                        RankNTypes
@@ -81,6 +82,7 @@ executable source-server
                        LambdaCase
                        MultiParamTypeClasses
                        MultiWayIf
+                       OverloadedStrings
                        PatternSynonyms
                        PolyKinds
                        RankNTypes
@@ -127,6 +129,7 @@ executable source-client
                        LambdaCase
                        MultiParamTypeClasses
                        MultiWayIf
+                       OverloadedStrings
                        PatternSynonyms
                        PolyKinds
                        RankNTypes

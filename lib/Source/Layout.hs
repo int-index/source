@@ -35,6 +35,7 @@ module Source.Layout
 import Control.Lens
 import Data.Monoid
 import Data.Either
+import Data.String
 
 data Point x y =
   Point {
@@ -163,6 +164,9 @@ collageRebox rebox collage = CollageMove box mempty collage
 
 data Layout x y a = Layout ((a -> Box x y) -> Collage x y a)
   deriving (Functor)
+
+instance IsString a => IsString (Layout x y a) where
+  fromString = layoutSingleton . fromString
 
 layoutCollage :: (a -> Box x y) -> Layout x y a -> Collage x y a
 layoutCollage getBox (Layout getCollage) = getCollage getBox

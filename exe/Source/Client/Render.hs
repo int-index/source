@@ -9,6 +9,7 @@ import Data.List as List
 import Graphics.Vty as Vty
 import Data.Semigroup
 import Data.EnumMap.Lazy as EnumMapL
+import Data.String
 
 import Source.Model
 import Source.Value
@@ -17,10 +18,32 @@ import Source.Util
 import Source.Layout
 import Source.Client.Render.Layout
 
+newtype ActiveZone = ActiveZone NodeId
+
+data Rendered =
+  RenderedEmpty |
+  RenderedString Vty.Attr String |
+  RenderedActiveZone ActiveZone
+
+renderedToEither :: Rendered -> Either ActiveZone Vty.Image
+renderedToEither = \case
+  RenderedEmpty -> Right emptyImage
+  RenderedString attr str -> Right (string attr str)
+  RenderedActiveZone activeZone -> Left activeZone
+
+renderedBox :: Rendered -> Box Int Int
+renderedBox = \case
+  RenderedEmpty -> imageBox emptyImage
+  RenderedString attr str -> imageBox (string attr str)
+  RenderedActiveZone _ -> error "Active zone has no inherent size"
+
+instance IsString Rendered where
+  fromString = RenderedString defAttr
+
 renderValue ::
   (Num x, Num y, Ord x, Ord y) =>
   Value ->
-  Layout x y (Either a Vty.Image)
+  Layout x y Rendered
 renderValue = \case
   ValueInteger n ->
     layoutString (defAttr `withForeColor` blue) $ show @Integer n
@@ -29,10 +52,10 @@ renderValue = \case
   ValueList vs ->
     let
       img = List.foldr1 layoutHorizontalTop [
-        layoutChar defAttr '[',
+        "[",
         List.foldr1 layoutHorizontalTop $
-          intersperse (layoutString defAttr "; ") (renderValue <$> vs),
-        layoutChar defAttr ']' ]
+          intersperse "; " (renderValue <$> vs),
+        "]" ]
       strVal = do
         for vs $ \case
           ValueChar c -> Just c
@@ -43,7 +66,7 @@ renderValue = \case
           layoutString (defAttr `withForeColor` red) $ show @String cs
         _ -> img
 
-renderIdentifier :: Identifier -> Layout x y (Either a Vty.Image)
+renderIdentifier :: Identifier -> Layout x y Rendered
 renderIdentifier =
   layoutString (defAttr `withStyle` bold) .
     nameToString . identifierToName
@@ -86,31 +109,30 @@ renderModel
     ptrNodeId = pointerSelectNodeId activeZoneElements
     (activeZoneElements, imageElements) =
       elementsPartition .
+      fmap (over elementObject renderedToEither) .
       collageElements .
-      layoutCollage (either (error "ActiveZone box") imageBox) $
+      layoutCollage renderedBox $
       rView
     rView = layoutVerticalLeft rLastEvent rNodes
     rLastEvent =
       case mLastEvent of
-        Nothing -> Right <$> layoutEmptyImage
-        Just lastEvent -> layoutString defAttr (show lastEvent)
-    rNodes = List.foldr layoutVerticalLeft (Right <$> layoutEmptyImage) $
+        Nothing -> layoutSingleton RenderedEmpty
+        Just lastEvent -> fromString (show lastEvent)
+    rNodes = List.foldr layoutVerticalLeft (layoutSingleton RenderedEmpty) $
       renderNode enableIdentifiersResolution nodes <$>
         nodesToposort nodes edges
-
-newtype ActiveZone = ActiveZone NodeId
 
 layoutActivate ::
   (Ord x, Ord y) =>
   ActiveZone ->
-  Layout x y (Either ActiveZone a) ->
-  Layout x y (Either ActiveZone a)
+  Layout x y Rendered ->
+  Layout x y Rendered
 layoutActivate activeZone layout = Layout $ \getBox ->
   let
     box = collageBox collage
     collage = layoutCollage getBox layout
   in
-    collageSuperimpose (collageElement box (Left activeZone)) collage
+    collageSuperimpose (collageElement box (RenderedActiveZone activeZone)) collage
 
 pointerSelectNodeId ::
   (Ord x, Ord y) =>
@@ -123,17 +145,14 @@ pointerSelectNodeId activeZones (x, y) =
   where
     inBounds el = boxInside (el ^. elementBox) (Point x y)
 
-layoutChar :: Attr -> Char -> Layout x y (Either a Image)
-layoutChar attr c = Right <$> layoutSingleton (char attr c)
-
-layoutString :: Attr -> String -> Layout x y (Either a Image)
-layoutString attr s = Right <$> layoutSingleton (string attr s)
+layoutString :: Attr -> String -> Layout x y Rendered
+layoutString attr s = layoutSingleton (RenderedString attr s)
 
 renderNode ::
   EnableIdentifiersResolution ->
   Nodes ->
   NodeInfo ->
-  Layout Int Int (Either ActiveZone Image)
+  Layout Int Int Rendered
 renderNode
     (EnableIdentifiersResolution enableIdentifiersResolution)
     nodes
@@ -164,11 +183,11 @@ renderNode
             rEdgeValueWidth' = (Option . Just . Max) rEdgeValueWidth
             rEdge = List.foldr1 layoutHorizontalTop [
               rSourceNodeId,
-              layoutString defAttr " ──",
-              layoutString defAttr (List.replicate padLeftWidth '─'),
+              " ──",
+              fromString (List.replicate padLeftWidth '─'),
               rEdgeValue,
-              layoutString defAttr (List.replicate padRightWidth '─'),
-              layoutString defAttr "──┤" ]
+              fromString (List.replicate padRightWidth '─'),
+              "──┤" ]
           in
             (rEdgeValueWidth', rEdge)
         renderOutwardEdge maxREdgeValueWidth edge =
@@ -180,14 +199,15 @@ renderNode
               distribExcess maxREdgeValueWidth rEdgeValueWidth
             rEdgeValueWidth' = (Option . Just . Max) rEdgeValueWidth
             rEdge = List.foldr1 layoutHorizontalTop [
-              layoutString defAttr "├──",
-              layoutString defAttr (List.replicate padLeftWidth '─'),
+              "├──",
+              fromString (List.replicate padLeftWidth '─'),
               rEdgeValue,
-              layoutString defAttr (List.replicate padRightWidth '─'),
-              layoutString defAttr "── ", rTargetNodeId ]
+              fromString (List.replicate padRightWidth '─'),
+              "── ",
+              rTargetNodeId ]
           in
             (rEdgeValueWidth', rEdge)
-        rEmptyEdge = layoutChar defAttr '│'
+        rEmptyEdge = "│"
         rNodeOutwardEdges = rEdges
           where
             (maxREdgeValueWidth, rEdges) =
@@ -200,15 +220,12 @@ renderNode
               sequenceA $ renderInwardEdge maxREdgeValueWidth' <$>
                 inwardEdges
             maxREdgeValueWidth' = option 0 getMax maxREdgeValueWidth
-        rNodeDef = List.foldr1 layoutHorizontalTop
-          [ layoutChar defAttr ' '
-          , if enableIdentifiersResolution
-              then rNodeValue
-              else List.foldr1 layoutHorizontalTop [
-                rNodeId,
-                layoutString defAttr ": ",
-                rNodeValue ]
-          , layoutChar defAttr ' ' ]
+        rNodeDef = List.foldr1 layoutHorizontalTop [
+          " ",
+          if enableIdentifiersResolution
+            then rNodeValue
+            else List.foldr1 layoutHorizontalTop [rNodeId, ": ", rNodeValue ],
+          " " ]
         rBlockHeight =
           List.length rNodeInwardEdges `max`
           List.length rNodeOutwardEdges `max`
@@ -222,27 +239,27 @@ renderNode
         rBlock = List.foldr1 layoutHorizontalTop [
           List.foldr1 layoutVerticalRight $
             List.concat [
-              [layoutChar defAttr '┌'],
+              ["┌"],
               List.replicate rInwardTopPad rEmptyEdge,
               rNodeInwardEdges,
               List.replicate rInwardBottomPad rEmptyEdge,
-              [layoutChar defAttr '└'] ],
+              ["└"] ],
           List.foldr1 layoutVerticalLeft [
-            layoutString defAttr $
+            fromString $
               List.replicate (layoutWidth getBox rNodeDef) '─',
             layoutActivate activeZone $
             layoutPadTop rNodeDefTopPad $
             layoutPadBottom rNodeDefBottomPad $
               rNodeDef,
-            layoutString defAttr $
+            fromString $
               List.replicate (layoutWidth getBox rNodeDef) '─' ],
           List.foldr1 layoutVerticalLeft $
             List.concat [
-              [layoutChar defAttr '┐'],
+              ["┐"],
               List.replicate rOutwardTopPad rEmptyEdge,
               rNodeOutwardEdges,
               List.replicate rOutwardBottomPad rEmptyEdge,
-              [layoutChar defAttr '┘'] ] ]
+              ["┘"] ] ]
       in
         layoutCollage getBox rBlock
 
