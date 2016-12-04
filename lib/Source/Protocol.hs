@@ -8,6 +8,7 @@ import Data.Serialize as Cereal
 import GHC.Generics (Generic)
 
 import Source.Protocol.Handle
+import Source.Edit
 import Source.Model
 
 data ServerMessage
@@ -20,6 +21,7 @@ instance Serialize ServerMessage
 data ClientMessage
   = MessageModelGet
   | MessageCursorRequest
+  | MessageModelEdit EditAction
   deriving (Show, Generic)
 
 instance Serialize ClientMessage

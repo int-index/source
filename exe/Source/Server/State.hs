@@ -13,6 +13,7 @@ module Source.Server.State
   , serverStateCreateNode
   , serverStateInsertEdge
   , serverStateAssignCursor
+  , serverStateEdit
   , serverStateSample
   , module Source.Server.State.Client
   ) where
@@ -25,6 +26,7 @@ import Data.Foldable
 import Source.Value
 import Source.Identifier
 import Source.Model
+import Source.Edit
 import Source.Server.State.Client
 
 data ServerState = ServerState
@@ -103,6 +105,19 @@ serverStateAssignCursor clientId = do
       zoom serverStateClients $
         clientsAssignCursor clientId cursorId
       return cursorId
+
+serverStateEdit :: ClientId -> EditAction -> State ServerState ()
+serverStateEdit clientId editAction = do
+  client <- uses serverStateClients $ clientsGet clientId
+  case editAction of
+    EditActionCursorSet cursor -> do
+      for_ @Maybe (client ^. clientCursorId) $ \cursorId ->
+        serverStateCursors %= cursorsSet cursorId cursor
+    EditActionCreateNode value -> do
+      _nodeId <- serverStateCreateNode value
+      return ()
+    EditActionInsertEdge edge ->
+      serverStateInsertEdge edge
 
 serverStateSample :: State ServerState ()
 serverStateSample = do

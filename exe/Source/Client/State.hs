@@ -5,6 +5,7 @@ module Source.Client.State
   , clientStateEdges
   , clientStateCursors
   , clientStateCursorId
+  , clientStatePtrNodeId
   , clientStateEmpty
   ) where
 
@@ -19,6 +20,7 @@ data ClientState = ClientState
   , _clientStateEdges :: Edges
   , _clientStateCursors :: Cursors
   , _clientStateCursorId :: Maybe CursorId
+  , _clientStatePtrNodeId :: (Int, Int) -> Maybe NodeId
   } deriving ()
 
 makeLenses ''ClientState
@@ -29,4 +31,5 @@ clientStateEmpty = ClientState
   , _clientStateNodes = nodesEmpty
   , _clientStateEdges = edgesEmpty
   , _clientStateCursors = cursorsEmpty
-  , _clientStateCursorId = Nothing }
+  , _clientStateCursorId = Nothing
+  , _clientStatePtrNodeId = const Nothing }

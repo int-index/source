@@ -12,7 +12,6 @@ import Control.Exception (evaluate)
 import Control.Lens
 import Text.Show.Pretty
 
-import Source.Value
 import Source.Protocol
 import Source.Server.State
 import Source.Util
@@ -99,10 +98,9 @@ receiveMessages serverStateRef clientId = forever $ do
         serverStateAssignCursor clientId
       writeChan messageChan $
         MessageCursorAssign cursorId
-    _ -> do
-      _ <- atomicRunStateIORef' serverStateRef $
-        serverStateCreateNode $
-          toValue ()
+    MessageModelEdit editAction -> do
+      atomicRunStateIORef' serverStateRef $
+        serverStateEdit clientId editAction
       (nodes, edges, cursors) <-
         view serverStateModel <$> readIORef serverStateRef
       clients' <- view serverStateClients <$>

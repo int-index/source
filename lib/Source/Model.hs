@@ -34,6 +34,7 @@ module Source.Model
   , _Cursors
   , cursorsEmpty
   , cursorsInsert
+  , cursorsSet
   , cursorsMember
   , cursorsDelete
   ) where
@@ -162,6 +163,11 @@ cursorsEmpty = _Cursors # EnumMapL.empty
 cursorsInsert :: CursorId -> Cursor -> Cursors -> Cursors
 cursorsInsert cursorId cursor = over _Cursors $
   \cursors -> assert (EnumMapL.notMember cursorId cursors) $
+    EnumMapL.insert cursorId cursor cursors
+
+cursorsSet :: CursorId -> Cursor -> Cursors -> Cursors
+cursorsSet cursorId cursor = over _Cursors $
+  \cursors -> assert (EnumMapL.member cursorId cursors) $
     EnumMapL.insert cursorId cursor cursors
 
 cursorsMember :: CursorId -> Cursors -> Bool

@@ -6,6 +6,7 @@ module Source.Client.Render
 import Control.Lens
 import Data.Traversable
 import Data.List as List
+import Data.List.NonEmpty as NonEmpty
 import Graphics.Vty as Vty
 import Data.Semigroup
 import Data.EnumMap.Lazy as EnumMapL
@@ -51,11 +52,13 @@ renderValue = \case
     layoutString (defAttr `withForeColor` yellow) $ show @Char c
   ValueList vs ->
     let
-      img = List.foldr1 layoutHorizontalTop [
-        "[",
-        List.foldr1 layoutHorizontalTop $
-          intersperse "; " (renderValue <$> vs),
-        "]" ]
+      img = case nonEmpty vs of
+        Nothing -> "[]"
+        Just vs' -> List.foldr1 layoutHorizontalTop [
+          "[",
+          List.foldr1 layoutHorizontalTop $
+            NonEmpty.intersperse "; " (renderValue <$> vs'),
+          "]" ]
       strVal = do
         for vs $ \case
           ValueChar c -> Just c

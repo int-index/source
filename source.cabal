@@ -112,7 +112,7 @@ executable source-client
                        Source.Client.Render.Layout
                        Source.Client.State
 
-  build-depends:       base, source, enummapset-th, lens, vty, network
+  build-depends:       base, source, enummapset-th, mtl, lens, vty, network
 
   default-language:    Haskell2010
   default-extensions:  BangPatterns
