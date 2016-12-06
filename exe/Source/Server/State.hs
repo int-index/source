@@ -22,6 +22,7 @@ import Control.Lens
 import Control.Monad.State
 import Control.Exception
 import Data.Foldable
+import Data.Map as Map
 
 import Source.Value
 import Source.Identifier
@@ -101,7 +102,7 @@ serverStateAssignCursor clientId = do
         return cursorId
     Nothing -> do
       cursorId <- CursorId <$> serverStateNewIdentifier
-      serverStateCursors %= cursorsInsert cursorId CursorNone
+      serverStateCursors %= cursorsInsert cursorId (_Cursor # Map.empty)
       zoom serverStateClients $
         clientsAssignCursor clientId cursorId
       return cursorId

@@ -27,9 +27,7 @@ module Source.Model
   , edgesNodeEdges
   -- Cursors
   , Cursor(..)
-  , _CursorNone
-  , _CursorSingle
-  , _CursorPair
+  , _Cursor
   , Cursors(..)
   , _Cursors
   , cursorsEmpty
@@ -37,12 +35,14 @@ module Source.Model
   , cursorsSet
   , cursorsMember
   , cursorsDelete
+  , cursorsLookup
   ) where
 
 import Control.Lens
 import Data.Serialize as Cereal
 import Data.EnumMap.Lazy as EnumMapL
 import Data.MultiSet as MultiSet
+import Data.Map as Map
 import GHC.Generics as Generic
 import Control.Applicative
 import Control.Exception (assert)
@@ -140,10 +140,7 @@ edgesNodeEdges nodeId edges =
 edgesInsert :: Edge -> Edges -> Edges
 edgesInsert edge = over _Edges $ MultiSet.insert edge
 
-data Cursor
-  = CursorNone
-  | CursorSingle NodeId
-  | CursorPair NodeId NodeId
+data Cursor = Cursor (Map Value NodeId)
   deriving (Eq, Show, Generic)
 
 makePrisms ''Cursor
@@ -177,6 +174,9 @@ cursorsDelete :: CursorId -> Cursors -> Cursors
 cursorsDelete cursorId = over _Cursors $
   \cursors -> assert (EnumMapL.member cursorId cursors) $
     EnumMapL.delete cursorId cursors
+
+cursorsLookup :: CursorId -> Cursors -> Maybe Cursor
+cursorsLookup cursorId cursors = EnumMapL.lookup cursorId (cursors ^. _Cursors)
 
 nodesValidEdge :: Edge -> Nodes -> Bool
 nodesValidEdge edge nodes =

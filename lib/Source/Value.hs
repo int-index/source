@@ -6,6 +6,7 @@ module Source.Value
   ) where
 
 import Data.Bool
+import Data.String
 import Data.Functor.Identity
 import Control.Exception
 import Data.Serialize as Cereal
@@ -26,6 +27,9 @@ instance Exception ValueInvalid
 
 valueInvalid :: a
 valueInvalid = throw ValueInvalid
+
+instance IsString Value where
+  fromString = ValueList . fmap ValueChar
 
 class ValueRep v where
   -- fromValue . toValue = id
