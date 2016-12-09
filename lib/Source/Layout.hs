@@ -71,7 +71,7 @@ data Collage x y a =
   CollageSuperimpose (Box x y) (Collage x y a) (Collage x y a)
   deriving (Functor)
 
-boxMove :: Monoid (Point x y) => Point x y -> Box x y -> Box x y
+boxMove :: (Num x, Num y) => Point x y -> Box x y -> Box x y
 boxMove offset (Box a b) = Box (a <> offset) (b <> offset)
 
 boxSuperimpose :: (Ord x, Ord y) => Box x y -> Box x y -> Box x y

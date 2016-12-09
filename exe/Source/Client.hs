@@ -31,9 +31,7 @@ clientStatePicture = do
     (picture, ptrNodeId) = renderModel
       (EnableIdentifiersResolution True)
       (clientState ^. clientStateLastEvent)
-      (clientState ^. clientStateNodes)
-      (clientState ^. clientStateEdges)
-      (clientState ^. clientStateCursors)
+      (clientState ^. clientStateModel)
   clientStatePtrNodeId .= ptrNodeId
   return picture
 
@@ -41,11 +39,9 @@ receiveMessages :: Vty -> IORef ClientState -> Handle -> IO ()
 receiveMessages vty clientStateRef handle = forever $ do
   message <- hGetMessage handle
   case message of
-    MessageModelPut nodes edges cursors ->
+    MessageModelPut model ->
       atomicRunStateIORef' clientStateRef $ do
-        clientStateNodes .= nodes
-        clientStateEdges .= edges
-        clientStateCursors .= cursors
+        clientStateModel .= model
     MessageCursorAssign cursorId ->
       atomicRunStateIORef' clientStateRef $ do
         clientStateCursorId .= Just cursorId
@@ -91,7 +87,7 @@ updateCursor (x, y) updCur clientState = do
   clientState ^. clientStateCursorId <&> \cursorId ->
     let
       mOldCursor = cursorsLookup cursorId
-        (clientState ^. clientStateCursors)
+        (clientState ^. clientStateModel . modelCursors)
       defaultCursor = _Cursor # Map.empty
       baseCursor = fromMaybe defaultCursor mOldCursor
       mNodeId = (clientState ^. clientStatePtrNodeId) (x, y)

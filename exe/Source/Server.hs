@@ -88,10 +88,9 @@ receiveMessages serverStateRef clientId = forever $ do
   case message of
     MessageModelGet -> do
       let messageChan = client ^. clientMessageChan
-      (nodes, edges, cursors) <-
-        view serverStateModel <$> readIORef serverStateRef
+      model <- view serverStateModel <$> readIORef serverStateRef
       writeChan messageChan $
-        MessageModelPut nodes edges cursors
+        MessageModelPut model
     MessageCursorRequest -> do
       let messageChan = client ^. clientMessageChan
       cursorId <- atomicRunStateIORef' serverStateRef $
@@ -101,14 +100,13 @@ receiveMessages serverStateRef clientId = forever $ do
     MessageModelEdit editAction -> do
       atomicRunStateIORef' serverStateRef $
         serverStateEdit clientId editAction
-      (nodes, edges, cursors) <-
-        view serverStateModel <$> readIORef serverStateRef
+      model <- view serverStateModel <$> readIORef serverStateRef
       clients' <- view serverStateClients <$>
         readIORef serverStateRef
       forClients clients' $ \_clientId client' -> do
         let messageChan = client' ^. clientMessageChan
         writeChan messageChan $
-          MessageModelPut nodes edges cursors
+          MessageModelPut model
 
 handleClient
   :: IORef ServerState

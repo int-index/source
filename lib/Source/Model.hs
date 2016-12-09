@@ -36,6 +36,12 @@ module Source.Model
   , cursorsMember
   , cursorsDelete
   , cursorsLookup
+  -- Model
+  , Model(..)
+  , modelNodes
+  , modelEdges
+  , modelCursors
+  , modelEmpty
   ) where
 
 import Control.Lens
@@ -182,3 +188,16 @@ nodesValidEdge :: Edge -> Nodes -> Bool
 nodesValidEdge edge nodes =
   nodesMember (edge ^. edgeSource) nodes &&
   nodesMember (edge ^. edgeTarget) nodes
+
+data Model = Model
+  { _modelNodes :: Nodes
+  , _modelEdges :: Edges
+  , _modelCursors :: Cursors
+  } deriving (Eq, Show, Generic)
+
+makeLenses ''Model
+
+instance Serialize Model
+
+modelEmpty :: Model
+modelEmpty = Model nodesEmpty edgesEmpty cursorsEmpty

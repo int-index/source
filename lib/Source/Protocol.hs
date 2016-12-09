@@ -12,7 +12,7 @@ import Source.Edit
 import Source.Model
 
 data ServerMessage
-  = MessageModelPut Nodes Edges Cursors
+  = MessageModelPut Model
   | MessageCursorAssign CursorId
   deriving (Show, Generic)
 

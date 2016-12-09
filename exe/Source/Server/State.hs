@@ -1,12 +1,9 @@
 module Source.Server.State
   ( ServerState
-  , serverStateNodes
-  , serverStateEdges
-  , serverStateCursors
+  , serverStateModel
   , serverStateFreeIdentifier
   , serverStateClients
   , serverStateEmpty
-  , serverStateModel
   , serverStateNewIdentifier
   , serverStateRegisterClient
   , serverStateUnregisterClient
@@ -31,9 +28,7 @@ import Source.Edit
 import Source.Server.State.Client
 
 data ServerState = ServerState
-  { _serverStateNodes :: Nodes
-  , _serverStateEdges :: Edges
-  , _serverStateCursors :: Cursors
+  { _serverStateModel :: Model
   , _serverStateFreeIdentifier :: Identifier
   , _serverStateClients :: Clients
   } deriving ()
@@ -42,24 +37,9 @@ makeLenses ''ServerState
 
 serverStateEmpty :: ServerState
 serverStateEmpty = ServerState
-  { _serverStateNodes = nodesEmpty
-  , _serverStateEdges = edgesEmpty
-  , _serverStateCursors = cursorsEmpty
+  { _serverStateModel = modelEmpty
   , _serverStateFreeIdentifier = minBound
   , _serverStateClients = clientsEmpty }
-
-serverStateModel :: Lens' ServerState (Nodes, Edges, Cursors)
-serverStateModel = lens getter setter
-  where
-    getter serverState =
-      ( _serverStateNodes serverState
-      , _serverStateEdges serverState
-      , _serverStateCursors serverState )
-    setter serverState (nodes, edges, cursors) =
-      serverState
-        { _serverStateNodes = nodes
-        , _serverStateEdges = edges
-        , _serverStateCursors = cursors }
 
 -- | Return the current free identifier and update the stored one.
 serverStateNewIdentifier :: State ServerState Identifier
@@ -74,21 +54,21 @@ serverStateUnregisterClient :: ClientId -> State ServerState ()
 serverStateUnregisterClient clientId = do
   client <- uses serverStateClients $ clientsGet clientId
   for_ (client ^. clientCursorId) $ \cursorId ->
-    serverStateCursors %= cursorsDelete cursorId
+    serverStateModel . modelCursors %= cursorsDelete cursorId
   zoom serverStateClients $
     clientsUnregister clientId
 
 serverStateCreateNode :: Value -> State ServerState NodeId
 serverStateCreateNode value = do
   nodeId <- NodeId <$> serverStateNewIdentifier
-  serverStateNodes %= nodesInsert nodeId (Node value)
+  serverStateModel . modelNodes %= nodesInsert nodeId (Node value)
   return nodeId
 
 serverStateInsertEdge :: Edge -> State ServerState ()
 serverStateInsertEdge edge = do
-  isValidEdge <- uses serverStateNodes (nodesValidEdge edge)
+  isValidEdge <- uses (serverStateModel . modelNodes) (nodesValidEdge edge)
   when isValidEdge $
-    serverStateEdges %= edgesInsert edge
+    serverStateModel . modelEdges %= edgesInsert edge
 
 serverStateAssignCursor :: ClientId -> State ServerState CursorId
 serverStateAssignCursor clientId = do
@@ -96,13 +76,14 @@ serverStateAssignCursor clientId = do
   case client ^. clientCursorId of
     Just cursorId -> do
       isValidCursor <-
-        uses serverStateCursors $
+        uses (serverStateModel . modelCursors) $
           cursorsMember cursorId
       assert isValidCursor $
         return cursorId
     Nothing -> do
       cursorId <- CursorId <$> serverStateNewIdentifier
-      serverStateCursors %= cursorsInsert cursorId (_Cursor # Map.empty)
+      serverStateModel . modelCursors %=
+        cursorsInsert cursorId (_Cursor # Map.empty)
       zoom serverStateClients $
         clientsAssignCursor clientId cursorId
       return cursorId
@@ -113,7 +94,7 @@ serverStateEdit clientId editAction = do
   case editAction of
     EditActionCursorSet cursor -> do
       for_ @Maybe (client ^. clientCursorId) $ \cursorId ->
-        serverStateCursors %= cursorsSet cursorId cursor
+        serverStateModel . modelCursors %= cursorsSet cursorId cursor
     EditActionCreateNode value -> do
       _nodeId <- serverStateCreateNode value
       return ()

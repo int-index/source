@@ -97,16 +97,12 @@ nodesToposort nodes edges = toposort $ do
 renderModel
   :: EnableIdentifiersResolution
   -> Maybe Vty.Event
-  -> Nodes
-  -> Edges
-  -> Cursors
+  -> Model
   -> (Vty.Picture, (Int, Int) -> Maybe NodeId)
 renderModel
     enableIdentifiersResolution
     mLastEvent
-    nodes
-    edges
-    _cursors = (pic, ptrNodeId)
+    (Model nodes edges _cursors) = (pic, ptrNodeId)
   where
     pic = renderImageElements imageElements
     ptrNodeId = pointerSelectNodeId activeZoneElements
