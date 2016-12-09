@@ -82,19 +82,18 @@ sendMessages vty clientStateRef handle = do
 
 data UpdateCursor = UpdateCursorTo | UpdateCursorFrom
 
-updateCursor :: (Int, Int) -> UpdateCursor -> ClientState -> Maybe Source.Cursor
+updateCursor :: (Int, Int) -> UpdateCursor -> ClientState -> Maybe (Map Value NodeId)
 updateCursor (x, y) updCur clientState = do
   clientState ^. clientStateCursorId <&> \cursorId ->
     let
-      mOldCursor = cursorsLookup cursorId
-        (clientState ^. clientStateModel . modelCursors)
-      defaultCursor = _Cursor # Map.empty
+      mOldCursor = modelCursorLookup cursorId (clientState ^. clientStateModel)
+      defaultCursor = Map.empty
       baseCursor = fromMaybe defaultCursor mOldCursor
       mNodeId = (clientState ^. clientStatePtrNodeId) (x, y)
       cursorPart = case updCur of
         UpdateCursorTo -> "to"
         UpdateCursorFrom -> "from"
-      newCursor = baseCursor & _Cursor . at cursorPart .~ mNodeId
+      newCursor = baseCursor & at cursorPart .~ mNodeId
     in
       newCursor
 

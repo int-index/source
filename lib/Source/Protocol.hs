@@ -13,7 +13,7 @@ import Source.Model
 
 data ServerMessage
   = MessageModelPut Model
-  | MessageCursorAssign CursorId
+  | MessageCursorAssign NodeId
   deriving (Show, Generic)
 
 instance Serialize ServerMessage

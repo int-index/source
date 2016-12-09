@@ -5,8 +5,6 @@ module Source.Model
   -- Identifiers
   , NodeId(..)
   , _NodeId
-  , CursorId(..)
-  , _CursorId
   -- Nodes
   , Node(..)
   , nodeValue
@@ -15,33 +13,28 @@ module Source.Model
   , nodesEmpty
   , nodesLookup
   , nodesInsert
+  , nodesSet
+  , nodesMember
+  , nodesDelete
   , nodesValidEdge
   -- Edges
   , Edge(..)
   , edgeSource
   , edgeTarget
   , edgeValue
+  , edgeRelated
   , Edges(..)
   , edgesEmpty
   , edgesInsert
+  , edgesPurge
   , edgesNodeEdges
-  -- Cursors
-  , Cursor(..)
-  , _Cursor
-  , Cursors(..)
-  , _Cursors
-  , cursorsEmpty
-  , cursorsInsert
-  , cursorsSet
-  , cursorsMember
-  , cursorsDelete
-  , cursorsLookup
   -- Model
   , Model(..)
   , modelNodes
   , modelEdges
-  , modelCursors
   , modelEmpty
+  , modelCursorLookup
+  , modelNodeDelete
   ) where
 
 import Control.Lens
@@ -50,6 +43,7 @@ import Data.EnumMap.Lazy as EnumMapL
 import Data.MultiSet as MultiSet
 import Data.Map as Map
 import GHC.Generics as Generic
+import Data.Functor
 import Control.Applicative
 import Control.Exception (assert)
 
@@ -80,11 +74,6 @@ newtype NodeId = NodeId Identifier
 
 makePrisms ''NodeId
 
-newtype CursorId = CursorId Identifier
-  deriving (Eq, Ord, Enum, Bounded, Show, Serialize)
-
-makePrisms ''CursorId
-
 data Node = Node
   { _nodeValue :: Value
   } deriving (Eq, Show, Generic)
@@ -108,11 +97,21 @@ nodesInsert nodeId node = over _Nodes $
   \nodes -> assert (EnumMapL.notMember nodeId nodes) $
     EnumMapL.insert nodeId node nodes
 
+nodesSet :: NodeId -> Node -> Nodes -> Nodes
+nodesSet nodeId node = over _Nodes $
+  \nodes -> assert (EnumMapL.member nodeId nodes) $
+    EnumMapL.insert nodeId node nodes
+
 nodesMember :: NodeId -> Nodes -> Bool
 nodesMember nodeId nodes = EnumMapL.member nodeId (nodes ^. _Nodes)
 
 nodesLookup :: NodeId -> Nodes -> Maybe Node
 nodesLookup nodeId nodes = EnumMapL.lookup nodeId (nodes ^. _Nodes)
+
+nodesDelete :: NodeId -> Nodes -> Nodes
+nodesDelete nodeId = over _Nodes $
+  \nodes -> assert (EnumMapL.member nodeId nodes) $
+    EnumMapL.delete nodeId nodes
 
 data Edge = Edge
   { _edgeSource :: NodeId
@@ -123,6 +122,11 @@ data Edge = Edge
 makeLenses ''Edge
 
 instance Serialize Edge
+
+edgeRelated :: NodeId -> Edge -> Bool
+edgeRelated nodeId edge =
+  edge ^. edgeSource == nodeId ||
+  edge ^. edgeTarget == nodeId
 
 newtype Edges = Edges (MultiSet Edge)
   deriving (Eq, Show, Generic)
@@ -143,46 +147,11 @@ edgesNodeEdges nodeId edges =
     isOutwardEdge edge = edge ^. edgeSource == nodeId
     isInwardEdge  edge = edge ^. edgeTarget == nodeId
 
+edgesPurge :: (Edge -> Bool) -> Edges -> Edges
+edgesPurge f = over _Edges $ MultiSet.filter (not . f)
+
 edgesInsert :: Edge -> Edges -> Edges
 edgesInsert edge = over _Edges $ MultiSet.insert edge
-
-data Cursor = Cursor (Map Value NodeId)
-  deriving (Eq, Show, Generic)
-
-makePrisms ''Cursor
-
-instance Serialize Cursor
-
-newtype Cursors = Cursors (EnumMapL CursorId Cursor)
-  deriving (Eq, Show, Generic)
-
-makePrisms ''Cursors
-
-instance Serialize Cursors
-
-cursorsEmpty :: Cursors
-cursorsEmpty = _Cursors # EnumMapL.empty
-
-cursorsInsert :: CursorId -> Cursor -> Cursors -> Cursors
-cursorsInsert cursorId cursor = over _Cursors $
-  \cursors -> assert (EnumMapL.notMember cursorId cursors) $
-    EnumMapL.insert cursorId cursor cursors
-
-cursorsSet :: CursorId -> Cursor -> Cursors -> Cursors
-cursorsSet cursorId cursor = over _Cursors $
-  \cursors -> assert (EnumMapL.member cursorId cursors) $
-    EnumMapL.insert cursorId cursor cursors
-
-cursorsMember :: CursorId -> Cursors -> Bool
-cursorsMember cursorId = EnumMapL.member cursorId . view _Cursors
-
-cursorsDelete :: CursorId -> Cursors -> Cursors
-cursorsDelete cursorId = over _Cursors $
-  \cursors -> assert (EnumMapL.member cursorId cursors) $
-    EnumMapL.delete cursorId cursors
-
-cursorsLookup :: CursorId -> Cursors -> Maybe Cursor
-cursorsLookup cursorId cursors = EnumMapL.lookup cursorId (cursors ^. _Cursors)
 
 nodesValidEdge :: Edge -> Nodes -> Bool
 nodesValidEdge edge nodes =
@@ -192,7 +161,6 @@ nodesValidEdge edge nodes =
 data Model = Model
   { _modelNodes :: Nodes
   , _modelEdges :: Edges
-  , _modelCursors :: Cursors
   } deriving (Eq, Show, Generic)
 
 makeLenses ''Model
@@ -200,4 +168,19 @@ makeLenses ''Model
 instance Serialize Model
 
 modelEmpty :: Model
-modelEmpty = Model nodesEmpty edgesEmpty cursorsEmpty
+modelEmpty = Model nodesEmpty edgesEmpty
+
+modelCursorLookup :: NodeId -> Model -> Maybe (Map Value NodeId)
+modelCursorLookup cursorId model =
+  nodesLookup cursorId (model ^. modelNodes) $>
+    let
+      (view atOutward -> outwardEdges) =
+        edgesNodeEdges cursorId (model ^. modelEdges)
+      edgeToCursorPart edge = (edge ^. edgeValue, edge ^. edgeTarget)
+    in
+      Map.fromList . fmap edgeToCursorPart $ outwardEdges
+
+modelNodeDelete :: NodeId -> Model -> Model
+modelNodeDelete nodeId =
+  over modelEdges (edgesPurge (edgeRelated nodeId)) .
+  over modelNodes (nodesDelete nodeId)

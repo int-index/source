@@ -40,7 +40,7 @@ data Client = Client
   , _clientHostName :: HostName
   , _clientPortNumber :: PortNumber
   , _clientMessageChan :: Chan ServerMessage
-  , _clientCursorId :: Maybe CursorId
+  , _clientCursorId :: Maybe NodeId
   } deriving ()
 
 makeLenses ''Client
@@ -88,7 +88,7 @@ clientsUnregister clientId = do
   assert isRegisteredClientId $ do
     clientsClients %= EnumMapS.delete clientId
 
-clientsAssignCursor :: ClientId -> CursorId -> State Clients ()
+clientsAssignCursor :: ClientId -> NodeId -> State Clients ()
 clientsAssignCursor clientId cursorId = do
   isRegisteredClientId <-
     uses clientsClients $

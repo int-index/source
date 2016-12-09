@@ -15,7 +15,7 @@ import Source.Model
 data ClientState = ClientState
   { _clientStateLastEvent :: Maybe Vty.Event
   , _clientStateModel :: Model
-  , _clientStateCursorId :: Maybe CursorId
+  , _clientStateCursorId :: Maybe NodeId
   , _clientStatePtrNodeId :: (Int, Int) -> Maybe NodeId
   } deriving ()
 

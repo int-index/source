@@ -19,6 +19,7 @@ import Control.Lens
 import Control.Monad.State
 import Control.Exception
 import Data.Foldable
+import Data.Monoid
 import Data.Map as Map
 
 import Source.Value
@@ -54,7 +55,7 @@ serverStateUnregisterClient :: ClientId -> State ServerState ()
 serverStateUnregisterClient clientId = do
   client <- uses serverStateClients $ clientsGet clientId
   for_ (client ^. clientCursorId) $ \cursorId ->
-    serverStateModel . modelCursors %= cursorsDelete cursorId
+    serverStateModel %= modelNodeDelete cursorId
   zoom serverStateClients $
     clientsUnregister clientId
 
@@ -70,20 +71,21 @@ serverStateInsertEdge edge = do
   when isValidEdge $
     serverStateModel . modelEdges %= edgesInsert edge
 
-serverStateAssignCursor :: ClientId -> State ServerState CursorId
+serverStateAssignCursor :: ClientId -> State ServerState NodeId
 serverStateAssignCursor clientId = do
   client <- uses serverStateClients $ clientsGet clientId
   case client ^. clientCursorId of
     Just cursorId -> do
       isValidCursor <-
-        uses (serverStateModel . modelCursors) $
-          cursorsMember cursorId
+        uses (serverStateModel . modelNodes) $
+          nodesMember cursorId
       assert isValidCursor $
         return cursorId
     Nothing -> do
-      cursorId <- CursorId <$> serverStateNewIdentifier
-      serverStateModel . modelCursors %=
-        cursorsInsert cursorId (_Cursor # Map.empty)
+      cursorId <- NodeId <$> serverStateNewIdentifier
+      let cursorNode = Node { _nodeValue = toValue () }
+      serverStateModel . modelNodes %=
+        nodesInsert cursorId cursorNode
       zoom serverStateClients $
         clientsAssignCursor clientId cursorId
       return cursorId
@@ -93,8 +95,19 @@ serverStateEdit clientId editAction = do
   client <- uses serverStateClients $ clientsGet clientId
   case editAction of
     EditActionCursorSet cursor -> do
-      for_ @Maybe (client ^. clientCursorId) $ \cursorId ->
-        serverStateModel . modelCursors %= cursorsSet cursorId cursor
+      for_ @Maybe (client ^. clientCursorId) $ \cursorId -> do
+        let
+          removeOldEdges = edgesPurge (\edge -> edge ^. edgeSource == cursorId)
+          newEdges       = do
+            (value, target) <- Map.toList cursor
+            return Edge
+              { _edgeSource = cursorId
+              , _edgeTarget = target
+              , _edgeValue  = value }
+          insertNewEdges = appEndo $
+            foldMap (Endo . edgesInsert) newEdges
+        serverStateModel . modelEdges %= insertNewEdges . removeOldEdges
+          -- cursorsSet cursorId (_Cursor # cursor)
     EditActionCreateNode value -> do
       _nodeId <- serverStateCreateNode value
       return ()

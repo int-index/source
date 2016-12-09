@@ -102,7 +102,7 @@ renderModel
 renderModel
     enableIdentifiersResolution
     mLastEvent
-    (Model nodes edges _cursors) = (pic, ptrNodeId)
+    (Model nodes edges) = (pic, ptrNodeId)
   where
     pic = renderImageElements imageElements
     ptrNodeId = pointerSelectNodeId activeZoneElements
