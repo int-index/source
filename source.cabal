@@ -16,7 +16,7 @@ library
                        Source.User
                        Source.Util
 
-  build-depends:       base, text, bytestring, cereal, containers, multiset,
+  build-depends:       base, text, bytestring, cereal, containers,
                        enummapset-th, mtl, lens
 
   default-language:    Haskell2010

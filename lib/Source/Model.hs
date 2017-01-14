@@ -40,7 +40,7 @@ module Source.Model
 import Control.Lens
 import Data.Serialize as Cereal
 import Data.EnumMap.Lazy as EnumMapL
-import Data.MultiSet as MultiSet
+import Data.Set as Set
 import Data.Map as Map
 import GHC.Generics as Generic
 import Data.Functor
@@ -128,7 +128,7 @@ edgeRelated nodeId edge =
   edge ^. edgeSource == nodeId ||
   edge ^. edgeTarget == nodeId
 
-newtype Edges = Edges (MultiSet Edge)
+newtype Edges = Edges (Set Edge)
   deriving (Eq, Show, Generic)
 
 makePrisms ''Edges
@@ -136,22 +136,22 @@ makePrisms ''Edges
 instance Serialize Edges
 
 edgesEmpty :: Edges
-edgesEmpty = _Edges # MultiSet.empty
+edgesEmpty = _Edges # Set.empty
 
 edgesNodeEdges :: NodeId -> Edges -> PerDirection [Edge]
 edgesNodeEdges nodeId edges =
-  MultiSet.toAscList <$> PerDirection outwardEdges inwardEdges
+  Set.toAscList <$> PerDirection outwardEdges inwardEdges
   where
-    outwardEdges = MultiSet.filter isOutwardEdge $ edges ^. _Edges
-    inwardEdges  = MultiSet.filter isInwardEdge  $ edges ^. _Edges
+    outwardEdges = Set.filter isOutwardEdge $ edges ^. _Edges
+    inwardEdges  = Set.filter isInwardEdge  $ edges ^. _Edges
     isOutwardEdge edge = edge ^. edgeSource == nodeId
     isInwardEdge  edge = edge ^. edgeTarget == nodeId
 
 edgesPurge :: (Edge -> Bool) -> Edges -> Edges
-edgesPurge f = over _Edges $ MultiSet.filter (not . f)
+edgesPurge f = over _Edges $ Set.filter (not . f)
 
 edgesInsert :: Edge -> Edges -> Edges
-edgesInsert edge = over _Edges $ MultiSet.insert edge
+edgesInsert edge = over _Edges $ Set.insert edge
 
 nodesValidEdge :: Edge -> Nodes -> Bool
 nodesValidEdge edge nodes =

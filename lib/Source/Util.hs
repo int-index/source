@@ -11,7 +11,6 @@ import Control.Monad.State
 import Data.Serialize as Cereal
 import Data.EnumMap.Lazy as EnumMapL
 import Data.EnumMap.Strict as EnumMapS
-import Data.MultiSet as MultiSet
 import Data.IORef
 import Data.Tuple
 import Data.Graph (stronglyConnComp, flattenSCCs)
@@ -33,7 +32,3 @@ instance
     Serialize (EnumMapL k a) where
   put = Cereal.put . EnumMapL.toAscList
   get = EnumMapL.fromDistinctAscList <$> Cereal.get
-
-instance Serialize a => Serialize (MultiSet a) where
-  put = Cereal.put . MultiSet.toAscList
-  get = MultiSet.fromDistinctAscList <$> Cereal.get

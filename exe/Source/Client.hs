@@ -53,7 +53,7 @@ sendMessages vty clientStateRef handle = do
   hPutMessage handle MessageCursorRequest
   hPutMessage handle MessageModelGet
   forever $ do
-    e <- nextEvent vty
+    e <- Vty.nextEvent vty
     clientState <-
       atomicRunStateIORef' clientStateRef $ do
         clientStateLastEvent .= Just e

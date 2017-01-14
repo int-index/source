@@ -41,4 +41,4 @@ sequential.
 
 Edges are triples, each containing the identifier of the source node,
 the identifier of the target node, and a value that defines the
-relation. Edges have no identifiers and form a multiset.
+relation. Edges have no identifiers and form a set.
