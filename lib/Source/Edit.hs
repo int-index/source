@@ -9,6 +9,8 @@ import Data.Map as Map
 import Source.Value
 import Source.Model
 
+-- TODO: Now I need a language for graph manipulations.
+
 data EditAction =
   EditActionCursorSet (Map Value NodeId) |
   EditActionCreateNode Value |

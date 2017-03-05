@@ -39,7 +39,7 @@ makeLenses ''ServerState
 serverStateEmpty :: ServerState
 serverStateEmpty = ServerState
   { _serverStateModel = modelEmpty
-  , _serverStateFreeIdentifier = minBound
+  , _serverStateFreeIdentifier = identifierZero
   , _serverStateClients = clientsEmpty }
 
 -- | Return the current free identifier and update the stored one.

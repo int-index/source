@@ -12,12 +12,16 @@ library
                        Source.Edit
                        Source.Protocol
                        Source.Protocol.Handle
+                       Source.Language.Core.Syn
+                       Source.Language.Core.Lexer
+                       Source.Language.Core.Parser
                        Source.Layout
                        Source.User
                        Source.Util
 
   build-depends:       base, text, bytestring, cereal, containers,
-                       enummapset-th, mtl, lens
+                       enummapset-th, mtl, lens, Earley, megaparsec,
+                       QuickCheck, generic-arbitrary
 
   default-language:    Haskell2010
   default-extensions:  BangPatterns
@@ -149,3 +153,48 @@ executable source-client
   ghc-prof-options:    -fprof-auto
                        -auto-all
                        -caf-all
+
+test-suite source-tests
+
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      tests
+  main-is:             Test/Suite.hs
+
+  other-modules:       Test.Source.Identifier
+                       Test.Source.Language
+                       Test.Util
+
+  build-depends:       base, source, lens, text,
+                       tasty, tasty-quickcheck, tasty-hunit
+
+  default-language:    Haskell2010
+  default-extensions:  BangPatterns
+                       ConstraintKinds
+                       DataKinds
+                       DeriveGeneric
+                       DeriveFunctor
+                       DeriveFoldable
+                       DeriveTraversable
+                       FlexibleContexts
+                       FlexibleInstances
+                       GADTs
+                       GeneralizedNewtypeDeriving
+                       LambdaCase
+                       MultiParamTypeClasses
+                       MultiWayIf
+                       OverloadedStrings
+                       PatternSynonyms
+                       PolyKinds
+                       RankNTypes
+                       RecordWildCards
+                       ScopedTypeVariables
+                       StandaloneDeriving
+                       TemplateHaskell
+                       TupleSections
+                       TypeApplications
+                       TypeFamilies
+                       TypeOperators
+                       UndecidableInstances
+                       ViewPatterns
+
+  ghc-options:         -Wall -fno-warn-missing-signatures

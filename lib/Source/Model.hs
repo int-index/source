@@ -70,7 +70,7 @@ instance Monoid a => Monoid (PerDirection a) where
 instance Serialize a => Serialize (PerDirection a)
 
 newtype NodeId = NodeId Identifier
-  deriving (Eq, Ord, Enum, Bounded, Show, Serialize)
+  deriving (Eq, Ord, Enum, Show, Serialize)
 
 makePrisms ''NodeId
 
