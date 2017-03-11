@@ -32,18 +32,17 @@ newtype Var = Var Int
 
 instance Serialize Var
 
-data Prim =
-  PrimAdd      {- integer addition -} |
-  PrimSubtract {- integer subtraction -}
-  deriving (Show, Eq, Generic)
+data Prim a =
+  PrimAdd      a a {- integer addition -} |
+  PrimSubtract a a {- integer subtraction -}
+  deriving (Show, Eq, Functor, Generic)
 
-instance Serialize Prim
+instance Serialize a => Serialize (Prim a)
 
 data Exp =
   ExpVal Value |
   ExpCon ConId |
-  -- Primitives are never partially applied.
-  ExpPrim Prim [Exp] |
+  ExpPrim (Prim Exp) |
   ExpRef ExpId |
   Exp :@: Exp |
   ExpVar Var |
@@ -121,7 +120,7 @@ reduce prog = reduce' ctxEmpty
       e@ExpCon{} -> e
       ExpVar v -> ctxGet v ctx
       ExpRef expId -> reduce' ctx $ progGet expId prog
-      ExpPrim p xs -> reducePrim p (reduce' ctx <$> xs)
+      ExpPrim p -> reducePrim (reduce' ctx <$> p)
       ExpLam e -> ExpLam (reduce' (ctxExtend ctx) e)
       -- Beta-reduction
       f :@: a ->
@@ -133,32 +132,32 @@ reduce prog = reduce' ctxEmpty
             ExpLam e -> reduce' (ctxAppend a' ctx) e
             _ -> f' :@: a'
 
-reducePrim :: Prim -> [Exp] -> Exp
+reducePrim :: Prim Exp -> Exp
 -- Integer addition.
-reducePrim PrimAdd [a, b] |
+reducePrim (PrimAdd a b) |
   ExpVal (ValueInteger n) <- a,
   ExpVal (ValueInteger m) <- b =
     ExpVal (ValueInteger (n + m))
 -- Integer subtraction.
-reducePrim PrimSubtract [a, b] |
+reducePrim (PrimSubtract a b) |
   ExpVal (ValueInteger n) <- a,
   ExpVal (ValueInteger m) <- b =
     ExpVal (ValueInteger (n - m))
 -- Default case.
-reducePrim p xs = ExpPrim p xs
+reducePrim p = ExpPrim p
 
 {-
 expSample :: Exp
 expSample = (fn :@: arg1) :@: arg2
   where
-    fn = ExpLam (ExpLam (ExpPrim PrimSubtract [ExpVar (Var 0), ExpVar (Var 1)]))
+    fn = ExpLam (ExpLam (ExpPrim (PrimSubtract (ExpVar (Var 0)) (ExpVar (Var 1)))))
     arg1 = ExpVal (ValueInteger 15)
     arg2 = ExpVal (ValueInteger 30)
 
 expSample2 :: Int -> Exp
 expSample2 n = expChurchInt n :@: (fn :@: ExpVal (ValueInteger 1)) :@: ExpVal (ValueInteger 0)
   where
-    fn = ExpLam (ExpLam (ExpPrim PrimAdd [ExpVar (Var 0), ExpVar (Var 1)]))
+    fn = ExpLam (ExpLam (ExpPrim (PrimAdd (ExpVar (Var 0)) (ExpVar (Var 1)))))
 
 expChurchInt :: Int -> Exp
 expChurchInt n = ExpLam (ExpLam (Prelude.foldr (:@:) (ExpVar (Var 0)) (replicate n (ExpVar (Var 1))) ))
