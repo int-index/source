@@ -7,7 +7,17 @@ module Source.Language.Core.Syn
   , _Var
   , Prim(..)
   , Exp(..)
+  , _ExpVal
+  , _ExpCon
+  , _ExpPrim
+  , _ExpRef
+  , (.:@:)
+  , _ExpVar
+  , _ExpLam
   , Prog(..)
+  , _Prog
+  , progEmpty
+  , progFromList
   , progLookup
   , progGet
   , ExpressionNotFound(..)
@@ -59,15 +69,25 @@ data Exp =
   ExpLam Exp
   deriving (Show, Eq, Generic)
 
+makePrisms ''Exp
+
 instance Serialize Exp
 
 newtype Prog = Prog (EnumMapL ExpId Exp)
   deriving (Show, Eq, Generic)
 
+makePrisms ''Prog
+
 instance Serialize Prog
 
+progEmpty :: Prog
+progEmpty = _Prog # EnumMapL.empty
+
+progFromList :: [(ExpId, Exp)] -> Prog
+progFromList defs = _Prog # EnumMapL.fromList defs
+
 progLookup :: ExpId -> Prog -> Maybe Exp
-progLookup expId (Prog exps) = EnumMapL.lookup expId exps
+progLookup expId prog = EnumMapL.lookup expId (prog ^. _Prog)
 
 data ExpressionNotFound = ExpressionNotFound ExpId
   deriving (Show)

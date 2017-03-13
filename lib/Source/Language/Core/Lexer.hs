@@ -1,6 +1,16 @@
 module Source.Language.Core.Lexer
   ( BracketSide(..)
   , Token(..)
+  , _TokenIdentifier
+  , _TokenChar
+  , _TokenString
+  , _TokenInteger
+  , _TokenSquareBracket
+  , _TokenParenthesis
+  , _TokenComma
+  , _TokenDot
+  , _TokenEquals
+  , _TokenUnknown
   , tokenize
   , tokenize'
   , detokenize
@@ -43,8 +53,12 @@ data Token =
   TokenSquareBracket BracketSide |
   TokenParenthesis BracketSide |
   TokenComma |
+  TokenDot |
+  TokenEquals |
   TokenUnknown UnknownChar
   deriving (Eq, Ord, Show, Generic)
+
+makePrisms ''Token
 
 instance Arbitrary Token where
   arbitrary = genericArbitrary
@@ -63,6 +77,8 @@ tokenRender = \case
     BracketSideOpening -> "("
     BracketSideClosing -> ")"
   TokenComma -> ","
+  TokenDot -> "."
+  TokenEquals -> "="
   TokenUnknown (UnknownChar c) -> Text.singleton c
 
 detokenize :: [Token] -> Text
@@ -112,7 +128,9 @@ pPunct =
   char ']' $> TokenSquareBracket BracketSideClosing <|>
   char '(' $> TokenParenthesis BracketSideOpening <|>
   char ')' $> TokenParenthesis BracketSideClosing <|>
-  char ',' $> TokenComma
+  char ',' $> TokenComma <|>
+  char '.' $> TokenDot <|>
+  char '=' $> TokenEquals
 
 pInteger :: Lexer Token
 pInteger = TokenInteger <$> (mkInteger <$> pSign <*> pNatural)

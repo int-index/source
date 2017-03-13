@@ -39,11 +39,13 @@ library
                        LambdaCase
                        MultiParamTypeClasses
                        MultiWayIf
+                       NegativeLiterals
                        OverloadedStrings
                        PatternSynonyms
                        PolyKinds
                        RankNTypes
                        RecordWildCards
+                       RecursiveDo
                        ScopedTypeVariables
                        StandaloneDeriving
                        TemplateHaskell
@@ -87,11 +89,13 @@ executable source-server
                        LambdaCase
                        MultiParamTypeClasses
                        MultiWayIf
+                       NegativeLiterals
                        OverloadedStrings
                        PatternSynonyms
                        PolyKinds
                        RankNTypes
                        RecordWildCards
+                       RecursiveDo
                        ScopedTypeVariables
                        StandaloneDeriving
                        TemplateHaskell
@@ -135,11 +139,13 @@ executable source-client
                        LambdaCase
                        MultiParamTypeClasses
                        MultiWayIf
+                       NegativeLiterals
                        OverloadedStrings
                        PatternSynonyms
                        PolyKinds
                        RankNTypes
                        RecordWildCards
+                       RecursiveDo
                        ScopedTypeVariables
                        StandaloneDeriving
                        TemplateHaskell
@@ -183,11 +189,13 @@ test-suite source-tests
                        LambdaCase
                        MultiParamTypeClasses
                        MultiWayIf
+                       NegativeLiterals
                        OverloadedStrings
                        PatternSynonyms
                        PolyKinds
                        RankNTypes
                        RecordWildCards
+                       RecursiveDo
                        ScopedTypeVariables
                        StandaloneDeriving
                        TemplateHaskell

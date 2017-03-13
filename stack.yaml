@@ -5,4 +5,4 @@ packages:
     commit: 67849c741253631f6c5d0bc79dec0ddab523203d
   extra-dep: true
 
-resolver: lts-8.3
+resolver: nightly-2017-03-13

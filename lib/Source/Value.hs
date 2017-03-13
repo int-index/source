@@ -1,15 +1,18 @@
 module Source.Value
   ( Value(..)
+  , _ValueInteger
+  , _ValueChar
+  , _ValueList
   , ValueRep(..)
   , ValueInvalid(..)
   , valueInvalid
   ) where
 
-import Data.Bool
-import Data.String
-import Data.Functor.Identity
 import Control.Exception
+import Control.Lens
+import Data.Bool
 import Data.Serialize as Cereal
+import Data.String
 import GHC.Generics (Generic)
 
 data Value
@@ -17,6 +20,8 @@ data Value
   | ValueChar Char
   | ValueList [Value]
   deriving (Eq, Ord, Show, Generic)
+
+makePrisms ''Value
 
 instance Serialize Value
 
