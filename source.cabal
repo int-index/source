@@ -15,6 +15,7 @@ library
                        Source.Language.Core.Syn
                        Source.Language.Core.Lexer
                        Source.Language.Core.Parser
+                       Source.Language.Core.Eval
                        Source.Layout
                        Source.User
                        Source.Util
