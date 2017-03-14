@@ -1,7 +1,11 @@
 module Source.Language.Core.Lexer
   ( BracketSide(..)
+  , _BracketSideOpening
+  , _BracketSideClosing
   , Token(..)
-  , _TokenIdentifier
+  , _TokenExpId
+  , _TokenConId
+  , _TokenVar
   , _TokenChar
   , _TokenString
   , _TokenInteger
@@ -22,18 +26,29 @@ import Control.Monad
 import Data.Functor
 import Data.List as List
 import Data.Maybe
+import Data.Monoid
 import Data.Text as Text
+import Data.Text.Lens
 import GHC.Generics (Generic)
+import Numeric.Natural
 import Test.QuickCheck.Arbitrary.Generic
 import Text.Megaparsec hiding (Token)
 import Text.Megaparsec.Lexer (charLiteral)
 
 import Source.Identifier
+import Source.Language.Core.Syn
 
 data BracketSide =
   BracketSideOpening |
   BracketSideClosing
   deriving (Eq, Ord, Show, Generic)
+
+makePrisms ''BracketSide
+
+withBracketSide :: a -> a -> BracketSide -> a
+withBracketSide onOpening onClosing = \case
+  BracketSideOpening -> onOpening
+  BracketSideClosing -> onClosing
 
 instance Arbitrary BracketSide where
   arbitrary = genericArbitrary
@@ -46,7 +61,9 @@ instance Arbitrary UnknownChar where
   arbitrary = pure (UnknownChar '\0')
 
 data Token =
-  TokenIdentifier Identifier |
+  TokenExpId ExpId |
+  TokenConId ConId |
+  TokenVar Var |
   TokenChar Char |
   TokenString String |
   TokenInteger Integer |
@@ -66,16 +83,14 @@ instance Arbitrary Token where
 
 tokenRender :: Token -> Text
 tokenRender = \case
-  TokenIdentifier ident -> (Text.pack . nameToString) (ident ^. named)
-  TokenChar c -> Text.pack (show c)
-  TokenString s -> Text.pack (show s)
-  TokenInteger n -> Text.pack (show n)
-  TokenSquareBracket bs -> case bs of
-    BracketSideOpening -> "["
-    BracketSideClosing -> "]"
-  TokenParenthesis bs -> case bs of
-    BracketSideOpening -> "("
-    BracketSideClosing -> ")"
+  TokenExpId ident ->        nameToText (ident ^. _ExpId . named)
+  TokenConId ident -> ":" <> nameToText (ident ^. _ConId . named)
+  TokenVar v -> "^" <> _Text . _Show . from _Var # v
+  TokenChar c -> _Text . _Show # c
+  TokenString s -> _Text . _Show # s
+  TokenInteger n -> _Text . _Show # n
+  TokenSquareBracket bs -> withBracketSide "[" "]" bs
+  TokenParenthesis bs -> withBracketSide "(" ")" bs
   TokenComma -> ","
   TokenDot -> "."
   TokenEquals -> "="
@@ -117,10 +132,12 @@ pSkip = skipMany (void spaceChar <|> pComment)
 pToken' :: Lexer Token
 pToken' = choice [
   pPunct,
-  pInteger,
-  pName,
-  pString,
-  pChar ] <?> "token"
+  TokenInteger <$> pInteger,
+  TokenConId <$> pConId,
+  TokenExpId <$> pExpId,
+  TokenVar <$> pVar,
+  TokenString <$> pString,
+  TokenChar <$> pChar ] <?> "token"
 
 pPunct :: Lexer Token
 pPunct =
@@ -132,42 +149,44 @@ pPunct =
   char '.' $> TokenDot <|>
   char '=' $> TokenEquals
 
-pInteger :: Lexer Token
-pInteger = TokenInteger <$> (mkInteger <$> pSign <*> pNatural)
+pInteger :: Lexer Integer
+pInteger = pSign <*> (toInteger <$> pNatural)
+  where
+    pSign =
+      char '+' $> id <|>
+      char '-' $> negate <|>
+      pure id
+
+pNatural :: Lexer Natural
+pNatural = digitsToNumber <$> some pDigit
   where
     digits = "0123456789"
     base = fromIntegral (List.length digits)
     digitsToNumber = List.foldl1' (\acc d -> d + acc * base)
-
-    pSign =
-      char '+' $> True  <|>
-      char '-' $> False <|>
-      pure True
-
     pDigit = choice $ List.zipWith (<$) [0..] (char <$> digits)
-
-    pNatural =
-      digitsToNumber <$> some pDigit
-
-    mkInteger sign nat =
-      case sign of
-        True  -> nat
-        False -> negate nat
 
 closing :: Lexer a -> Lexer ()
 closing p = void p <|> eof
 
-pName :: Lexer Token
-pName = TokenIdentifier . nameToIdentifier . unsafeStringToName <$>
-  some (oneOf alphabet)
+pName :: Lexer Identifier
+pName = nameToIdentifier . unsafeStringToName <$> some (oneOf alphabet)
 
-pString :: Lexer Token
-pString = TokenString <$>
-  (char '\"' *> manyTill (charLiteral <|> anyChar) (closing (char '\"')))
+pExpId :: Lexer ExpId
+pExpId = ExpId <$> pName
 
-pChar :: Lexer Token
-pChar = TokenChar <$>
-  between (char '\'') (closing (char '\'')) (charLiteral <|> anyChar)
+pConId :: Lexer ConId
+pConId = ConId <$> (char ':' *> pName)
+
+pVar :: Lexer Var
+pVar = Var <$> (char '^' *> pNatural)
+
+pString :: Lexer String
+pString =
+  char '\"' *>
+  manyTill (charLiteral <|> anyChar) (closing (char '\"'))
+
+pChar :: Lexer Char
+pChar = between (char '\'') (closing (char '\'')) (charLiteral <|> anyChar)
 
 pComment :: Lexer ()
 pComment = void comment <?> "comment"

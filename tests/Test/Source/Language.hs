@@ -16,7 +16,7 @@ import Source.Language.Core.Syn
 import Source.Value
 
 lexerInputSample1 :: Text
-lexerInputSample1 = " ( \"Hello\", [a] {-comment -} ) "
+lexerInputSample1 = " ( \"Hello\", [a] \"\\\"\" :a {-comment -} ) "
 
 lexerOutputSample1 :: [Token]
 lexerOutputSample1 = [
@@ -24,8 +24,10 @@ lexerOutputSample1 = [
   TokenString "Hello",
   TokenComma,
   TokenSquareBracket BracketSideOpening,
-  TokenIdentifier identifierZero,
+  TokenExpId (ExpId identifierZero),
   TokenSquareBracket BracketSideClosing,
+  TokenString "\"",
+  TokenConId (ConId identifierZero),
   TokenParenthesis BracketSideClosing ]
 
 parserInputSample1 :: Text
@@ -39,6 +41,17 @@ parserOutputSample1 = progFromList [
       ( _ExpId . named # unsafeStringToName s,
         _ExpVal . _ValueInteger # n )
 
+parserInputSample2 :: Text
+parserInputSample2 = "exp = :cons (:up 'a') ^0."
+
+parserOutputSample2 :: Prog
+parserOutputSample2 = progFromList [
+  ( _ExpId . named # unsafeStringToName "exp",
+    (_ExpCon . _ConId . named # unsafeStringToName "cons") :@:
+    ( (_ExpCon . _ConId . named # unsafeStringToName "up") :@:
+      (_ExpVal . _ValueChar # 'a') ) :@:
+    (_ExpVar . _Var # 0) ) ]
+
 testLanguage :: TestTree
 testLanguage = testGroup "Language" [
   testGroup "Lexer" [
@@ -50,5 +63,7 @@ testLanguage = testGroup "Language" [
       tokenize lexerInputSample1 @?= lexerOutputSample1 ],
   testGroup "Parser" [
     testCase "handles sample-1" $
-      parse parserInputSample1 @?= Right parserOutputSample1 ],
+      parse parserInputSample1 @?= Right parserOutputSample1,
+    testCase "handles sample-2" $
+      parse parserInputSample2 @?= Right parserOutputSample2 ],
   testGroup "Substitution" [ ] ]

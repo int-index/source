@@ -23,34 +23,34 @@ module Source.Language.Core.Syn
   , ExpressionNotFound(..)
   ) where
 
-import Control.Lens
 import Control.Exception
-import GHC.Generics as Generic
-import Data.Serialize as Cereal
+import Control.Lens
 import Data.EnumMap.Lazy as EnumMapL
 import Data.Maybe
+import Data.Serialize as Cereal
+import GHC.Generics as Generic
+import Numeric.Natural
+import Test.QuickCheck as QC
 
 import Source.Identifier
-import Source.Value
 import Source.Util
+import Source.Value
 
 newtype ExpId = ExpId Identifier
-  deriving (Eq, Ord, Enum, Show, Serialize)
+  deriving (Eq, Ord, Enum, Show, Serialize, Arbitrary)
 
 makePrisms ''ExpId
 
 newtype ConId = ConId Identifier
-  deriving (Eq, Ord, Enum, Show, Serialize)
+  deriving (Eq, Ord, Enum, Show, Serialize, Arbitrary)
 
 makePrisms ''ConId
 
 -- A de Bruijn index.
-newtype Var = Var Int
-  deriving (Show, Eq, Generic)
+newtype Var = Var Natural
+  deriving (Eq, Ord, Enum, Show, Serialize, Arbitrary)
 
 makePrisms ''Var
-
-instance Serialize Var
 
 data Prim a =
   PrimAdd      a a {- integer addition -} |

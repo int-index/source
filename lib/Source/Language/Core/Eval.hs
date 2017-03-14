@@ -33,7 +33,7 @@ newtype Ctx = Ctx [CtxElem]
 instance Serialize Ctx
 
 ctxLookup :: Var -> Ctx -> Maybe CtxElem
-ctxLookup (Var n) (Ctx es) = listToMaybe $ drop n es
+ctxLookup (Var n) (Ctx es) = listToMaybe $ drop (fromIntegral n) es
 
 ctxGet :: Var -> Ctx -> Exp
 ctxGet v ctx =
