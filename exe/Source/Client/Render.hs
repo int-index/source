@@ -100,9 +100,10 @@ renderModel
   -> Model
   -> (Vty.Picture, (Int, Int) -> Maybe NodeId)
 renderModel
-    enableIdentifiersResolution
-    mLastEvent
-    (Model nodes edges) = (pic, ptrNodeId)
+  enableIdentifiersResolution
+  mLastEvent
+  (Model nodes edges) =
+    (pic, ptrNodeId)
   where
     pic = renderImageElements imageElements
     ptrNodeId = pointerSelectNodeId activeZoneElements
@@ -131,7 +132,9 @@ layoutActivate activeZone layout = Layout $ \getBox ->
     box = collageBox collage
     collage = layoutCollage getBox layout
   in
-    collageSuperimpose (collageElement box (RenderedActiveZone activeZone)) collage
+    collageSuperimpose
+      (collageElement box (RenderedActiveZone activeZone))
+      collage
 
 pointerSelectNodeId ::
   (Ord x, Ord y) =>
@@ -153,9 +156,10 @@ renderNode ::
   NodeInfo ->
   Layout Int Int Rendered
 renderNode
-    (EnableIdentifiersResolution enableIdentifiersResolution)
-    nodes
-    nodeInfo = rNode
+  (EnableIdentifiersResolution enableIdentifiersResolution)
+  nodes
+  nodeInfo =
+    rNode
   where
     NodeInfo nodeId node edges = nodeInfo
     PerDirection outwardEdges inwardEdges = edges

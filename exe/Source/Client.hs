@@ -82,7 +82,11 @@ sendMessages vty clientStateRef handle = do
 
 data UpdateCursor = UpdateCursorTo | UpdateCursorFrom
 
-updateCursor :: (Int, Int) -> UpdateCursor -> ClientState -> Maybe (Map Value NodeId)
+updateCursor ::
+  (Int, Int) ->
+  UpdateCursor ->
+  ClientState ->
+  Maybe (Map Value NodeId)
 updateCursor (x, y) updCur clientState = do
   clientState ^. clientStateCursorId <&> \cursorId ->
     let

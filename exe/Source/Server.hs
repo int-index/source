@@ -45,7 +45,7 @@ handleConnections sock serverStateRef = forever $ do
   -- Handle the connected client in a separate thread.
   let handleClient' = handleClient serverStateRef clientId client
   _threadId <-
-     handleClient' `forkFinally` \_ -> do
+    handleClient' `forkFinally` \_ -> do
       -- Close the handle after the client is handled (sucessfully or
       -- with an exception).
       hClose handle
