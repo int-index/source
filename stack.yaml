@@ -1,8 +1,6 @@
 packages:
 - '.'
-- location:
-    git: https://github.com/typeable/generic-arbitrary
-    commit: 67849c741253631f6c5d0bc79dec0ddab523203d
-  extra-dep: true
 
 resolver: nightly-2017-03-13
+extra-deps:
+- generic-arbitrary-0.1.0
