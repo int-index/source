@@ -1,6 +1,5 @@
 module Test.Util where
 
-import Control.Applicative
 import Control.Lens
 import Test.Tasty
 import Test.Tasty.QuickCheck
@@ -8,13 +7,26 @@ import Test.Tasty.QuickCheck
 testIso ::
   (Eq a, Show a, Arbitrary a) =>
   (Eq b, Show b, Arbitrary b) =>
-  TestName ->
+  String ->
+  String ->
   Iso' a b ->
   TestTree
-testIso testName i =
+testIso objNameA objNameB i =
   testGroup testName [
     testProperty "from . to = id" $
-      liftA2 (==) id (review i . view i),
+      \x -> (review i . view i) x == x,
     testProperty "to . from = id" $
-      liftA2 (==) id (view i . review i) ]
+      \x -> (view i . review i) x == x ]
+  where
+    testName = objNameA ++ " is isomorphic to " ++ objNameB
 
+testMonotonic ::
+  (Ord a, Show a, Arbitrary a, Ord b) =>
+  String ->
+  (a -> b) ->
+  TestTree
+testMonotonic objName f =
+  testProperty testName $
+    \x y -> compare x y == compare (f x) (f y)
+  where
+    testName = objName ++ " is monotonic"

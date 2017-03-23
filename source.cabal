@@ -184,10 +184,10 @@ test-suite source-tests
                        DeriveTraversable
                        FlexibleContexts
                        FlexibleInstances
+                       FunctionalDependencies
                        GADTs
                        GeneralizedNewtypeDeriving
                        LambdaCase
-                       MultiParamTypeClasses
                        MultiWayIf
                        NegativeLiterals
                        OverloadedStrings

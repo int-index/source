@@ -46,7 +46,7 @@ newtype ConId = ConId Identifier
 
 makePrisms ''ConId
 
--- A de Bruijn index.
+-- | A de Bruijn index.
 newtype Var = Var Natural
   deriving (Eq, Ord, Enum, Show, Serialize, Arbitrary)
 

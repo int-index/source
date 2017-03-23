@@ -2,10 +2,10 @@ module Source.Model
   ( PerDirection(..)
   , atOutward
   , atInward
-  -- Identifiers
+  -- * Identifiers
   , NodeId(..)
   , _NodeId
-  -- Nodes
+  -- * Nodes
   , Node(..)
   , nodeValue
   , Nodes(..)
@@ -17,7 +17,7 @@ module Source.Model
   , nodesMember
   , nodesDelete
   , nodesValidEdge
-  -- Edges
+  -- * Edges
   , Edge(..)
   , edgeSource
   , edgeTarget
@@ -28,7 +28,7 @@ module Source.Model
   , edgesInsert
   , edgesPurge
   , edgesNodeEdges
-  -- Model
+  -- * Model
   , Model(..)
   , modelNodes
   , modelEdges

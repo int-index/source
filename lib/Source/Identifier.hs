@@ -20,17 +20,25 @@ import Numeric.Natural
 import Test.QuickCheck as QC
 
 alphabet :: [Char]
-alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+alphabet = "abcdefghijklmnopqrstuvwxyz"
 
 -- Invariant: non-empty and characters are in the alphabet
 newtype Name = Name String
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Show)
+
+instance Ord Name where
+  compare (Name a) (Name b) =
+    compare (List.length a) (List.length b) `mappend`
+    compare a b
 
 instance Arbitrary Name where
   arbitrary = do
     len <- choose (1, 1000)
     unsafeStringToName <$>
       vectorOf len (QC.elements alphabet)
+  shrink = \case
+    Name [] -> []
+    Name s  -> Name <$> (List.init . List.tail) (List.inits s)
 
 unsafeStringToName :: String -> Name
 unsafeStringToName = Name
@@ -82,5 +90,6 @@ nameToIdentifier (Name s) =
     k = List.length ns
     offset = sum (List.take k bases) - 1
 
+-- | An order-preserving isomorphism between 'Identifier' and 'Name'.
 named :: Iso' Identifier Name
 named = iso identifierToName nameToIdentifier

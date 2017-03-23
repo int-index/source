@@ -7,4 +7,6 @@ import Source.Identifier
 
 testIdentifier :: TestTree
 testIdentifier = testGroup "Identifier" [
-  testIso "isomorphic to Name" named ]
+  testIso "Identifier" "Name" named,
+  testMonotonic "identifierToName" identifierToName,
+  testMonotonic "nameToIdentifier" nameToIdentifier ]

@@ -25,17 +25,17 @@ data SerializationError
 
 instance Exception SerializationError
 
--- The message length is stored as a 32-bit unsigned integer. This is enough
+-- | The message length is stored as a 32-bit unsigned integer. This is enough
 -- to support up to messages of size almost up to 4 GiB.
 newtype MessageLength = MessageLength Word32
   deriving (Bounded)
 
--- Big-endian encoding is used as it is common in networking.
+-- | Big-endian encoding is used as it is common in networking.
 instance Serialize MessageLength where
   put = coerce Cereal.putWord32be
   get = coerce Cereal.getWord32be
 
--- Convert an 'Int' to 'MessageLength' with the necessary bound checking,
+-- | Convert an 'Int' to 'MessageLength' with the necessary bound checking,
 -- throws a 'SerializationError' in case of a failure.
 toMessageLength :: Int -> MessageLength
 toMessageLength n
@@ -48,7 +48,7 @@ toMessageLength n
       n < minMessageLength ||
       n > maxMessageLength
 
--- An inverse of 'toMessageLength'.
+-- | An inverse of 'toMessageLength'.
 fromMessageLength :: MessageLength -> Int
 fromMessageLength (MessageLength n) = fromIntegral n
 
