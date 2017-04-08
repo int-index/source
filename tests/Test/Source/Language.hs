@@ -2,6 +2,7 @@ module Test.Source.Language (testLanguage) where
 
 import Control.Applicative
 import Control.Lens
+import Data.List as List
 import Data.Maybe
 import Data.String
 import Data.Text
@@ -13,6 +14,7 @@ import Source.Identifier
 import Source.Language.Core.Lexer
 import Source.Language.Core.Parser
 import Source.Language.Core.Syn
+import Source.Language.Core.Eval
 import Source.Value
 
 lexerInputSample1 :: Text
@@ -33,24 +35,36 @@ lexerOutputSample1 = [
 parserInputSample1 :: Text
 parserInputSample1 = "n = -13. m= 42.\nk =+7. p=0."
 
-parserOutputSample1 :: Prog
+parserOutputSample1 :: Prog (BndrNi ()) ExpId
 parserOutputSample1 = progFromList [
   intDef "n" -13, intDef "m" 42, intDef "k" 7, intDef "p" 0 ]
   where
     intDef s n =
       ( _ExpId . named # unsafeStringToName s,
-        _ExpVal . _ValueInteger # n )
+        _ExpPrim . _PrimValue . _ValueInteger # n )
 
 parserInputSample2 :: Text
 parserInputSample2 = "exp = :cons (:up 'a') ^0."
 
-parserOutputSample2 :: Prog
+parserOutputSample2 :: Prog (BndrNi ()) ExpId
 parserOutputSample2 = progFromList [
   ( _ExpId . named # unsafeStringToName "exp",
     (_ExpCon . _ConId . named # unsafeStringToName "cons") :@:
     ( (_ExpCon . _ConId . named # unsafeStringToName "up") :@:
-      (_ExpVal . _ValueChar # 'a') ) :@:
-    (_ExpVar . _Var # 0) ) ]
+      (_ExpPrim . _PrimValue . _ValueChar # 'a') ) :@:
+    (_ExpNiVar # VarNi () 0) ) ]
+
+expChurchInt :: Int -> ExpHo b ref
+expChurchInt n =
+  lam $ \f ->
+  lam $ \a ->
+    List.foldr (:@:) a $ List.replicate n f
+
+expChurchInt' :: Int -> Integer -> ExpHo b ref
+expChurchInt' n k =
+  expChurchInt n :@: eAdd :@: ExpInteger k
+  where
+    eAdd = lam $ \a -> ExpPrim (PrimAdd (ExpInteger 1) a)
 
 testLanguage :: TestTree
 testLanguage = testGroup "Language" [
@@ -66,4 +80,9 @@ testLanguage = testGroup "Language" [
       parse parserInputSample1 @?= Right parserOutputSample1,
     testCase "handles sample-2" $
       parse parserInputSample2 @?= Right parserOutputSample2 ],
-  testGroup "Substitution" [ ] ]
+  testGroup "Evaluation" [
+    testProperty "handles church-encoded" $
+      \(Positive n) k ->
+        reduce progEmpty (expFromP @() (expChurchInt' n k)) ==
+        ExpInteger (fromIntegral n + k)
+    ] ]

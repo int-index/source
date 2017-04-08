@@ -7,6 +7,7 @@ module Source.Identifier
   , unsafeStringToName
   , Identifier
   , identifierZero
+  , identifierSucc
   , identifierToName
   , nameToIdentifier
   , named
@@ -16,6 +17,7 @@ import Control.Lens
 import Data.List as List
 import Data.Serialize as Cereal
 import Data.Text as Text
+import GHC.TypeLits
 import Numeric.Natural
 import Test.QuickCheck as QC
 
@@ -56,10 +58,20 @@ nameToText = Text.pack . nameToString
 
 -- Invariant: n >= 0
 newtype Identifier = Identifier Natural
-  deriving (Eq, Ord, Enum, Show, Serialize, Arbitrary)
+  deriving (Eq, Ord, Show, Serialize, Arbitrary)
+
+deriving instance
+  TypeError
+    ( 'Text "Identifiers cannot be given a proper " ':<>:
+      'ShowType Enum ':<>:
+      'Text " instance because for infinite types fromEnum is partial." ) =>
+    Enum Identifier
 
 identifierZero :: Identifier
 identifierZero = Identifier 0
+
+identifierSucc :: Identifier -> Identifier
+identifierSucc (Identifier n) = Identifier (n + 1)
 
 toDigits :: Natural -> Natural -> [Int]
 toDigits _    0 = []

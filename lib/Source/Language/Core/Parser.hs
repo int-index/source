@@ -20,17 +20,17 @@ inBrackets ::
 inBrackets p r =
   tok (p . _BracketSideOpening) *> r <* tok (p . _BracketSideClosing)
 
-gProg :: Grammar r (Prod r Text Token Prog)
+gProg :: Grammar r (Prod r Text Token (Prog (BndrNi ()) ExpId))
 gProg = mdo
   ntExpId <- rule $ tok _TokenExpId <?> "expression identifier"
   ntConId <- rule $ tok _TokenConId <?> "constructor identifier"
   ntVar <- rule $ tok _TokenVar <?> "variable index"
   ntExp' <- rule $
-    ExpVal . ValueInteger <$> tok _TokenInteger <|>
-    ExpVal . ValueChar <$> tok _TokenChar <|>
-    ExpVal . ValueList . fmap ValueChar <$> tok _TokenString <|>
-    ExpCon <$> ntConId <|>
-    ExpVar <$> ntVar <|>
+    review (_ExpPrim . _PrimValue . _ValueInteger) <$> tok _TokenInteger <|>
+    review (_ExpPrim . _PrimValue . _ValueChar) <$> tok _TokenChar <|>
+    review (_ExpPrim . _PrimValue . _ValueString) <$> tok _TokenString <|>
+    review _ExpCon <$> ntConId <|>
+    review _ExpNiVar <$> (VarNi () <$> ntVar) <|>
     inBrackets _TokenParenthesis ntExp
   ntExp <- rule $
     ntExp' <|>
@@ -42,10 +42,10 @@ gProg = mdo
   ntProg <- rule $ progFromList <$> many ntDef
   return ntProg
 
-pProg :: Parser Text [Token] Prog
+pProg :: Parser Text [Token] (Prog (BndrNi ()) ExpId)
 pProg = parser gProg
 
-parse :: Text -> Either (Report Text [Token]) Prog
+parse :: Text -> Either (Report Text [Token]) (Prog (BndrNi ()) ExpId)
 parse = toEither . fullParses pProg . tokenize
   where
     toEither = \case

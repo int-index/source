@@ -3,6 +3,7 @@ module Source.Value
   , _ValueInteger
   , _ValueChar
   , _ValueList
+  , _ValueString
   , ValueRep(..)
   , ValueInvalid(..)
   , valueInvalid
@@ -22,6 +23,9 @@ data Value
   deriving (Eq, Ord, Show, Generic)
 
 makePrisms ''Value
+
+_ValueString :: Prism' Value String
+_ValueString = _ValueList . below _ValueChar
 
 instance Serialize Value
 

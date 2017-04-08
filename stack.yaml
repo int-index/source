@@ -1,6 +1,6 @@
 packages:
 - '.'
 
-resolver: nightly-2017-03-13
+resolver: nightly-2017-04-07
 extra-deps:
 - generic-arbitrary-0.1.0

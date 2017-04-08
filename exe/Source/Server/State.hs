@@ -44,7 +44,7 @@ serverStateEmpty = ServerState
 
 -- | Return the current free identifier and update the stored one.
 serverStateNewIdentifier :: State ServerState Identifier
-serverStateNewIdentifier = serverStateFreeIdentifier <<%= succ
+serverStateNewIdentifier = serverStateFreeIdentifier <<%= identifierSucc
 
 serverStateRegisterClient :: Client -> State ServerState ClientId
 serverStateRegisterClient client =

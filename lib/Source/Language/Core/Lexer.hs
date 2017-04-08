@@ -63,7 +63,7 @@ instance Arbitrary UnknownChar where
 data Token =
   TokenExpId ExpId |
   TokenConId ConId |
-  TokenVar Var |
+  TokenVar Natural |
   TokenChar Char |
   TokenString String |
   TokenInteger Integer |
@@ -85,7 +85,7 @@ tokenRender :: Token -> Text
 tokenRender = \case
   TokenExpId ident ->        nameToText (ident ^. _ExpId . named)
   TokenConId ident -> ":" <> nameToText (ident ^. _ConId . named)
-  TokenVar v -> "^" <> _Text . _Show . from _Var # v
+  TokenVar v -> "^" <> _Text . _Show # v
   TokenChar c -> _Text . _Show # c
   TokenString s -> _Text . _Show # s
   TokenInteger n -> _Text . _Show # n
@@ -177,8 +177,8 @@ pExpId = ExpId <$> pName
 pConId :: Lexer ConId
 pConId = ConId <$> (char ':' *> pName)
 
-pVar :: Lexer Var
-pVar = Var <$> (char '^' *> pNatural)
+pVar :: Lexer Natural
+pVar = char '^' *> pNatural
 
 pString :: Lexer String
 pString =

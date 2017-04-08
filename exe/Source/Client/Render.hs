@@ -4,20 +4,20 @@ module Source.Client.Render
   ) where
 
 import Control.Lens
-import Data.Traversable
 import Data.List as List
 import Data.List.NonEmpty as NonEmpty
-import Graphics.Vty as Vty
+import Data.Map as Map
 import Data.Semigroup
-import Data.EnumMap.Lazy as EnumMapL
 import Data.String
+import Data.Traversable
+import Graphics.Vty as Vty
 
-import Source.Model
-import Source.Value
-import Source.Identifier
-import Source.Util
-import Source.Layout
 import Source.Client.Render.Layout
+import Source.Identifier
+import Source.Layout
+import Source.Model
+import Source.Util
+import Source.Value
 
 newtype ActiveZone = ActiveZone NodeId
 
@@ -87,7 +87,7 @@ data NodeInfo = NodeInfo NodeId Node (PerDirection [Edge])
 
 nodesToposort :: Nodes -> Edges -> [NodeInfo]
 nodesToposort nodes edges = toposort $ do
-  (nodeId, node) <- EnumMapL.toList (nodes ^. _Nodes)
+  (nodeId, node) <- Map.toList (nodes ^. _Nodes)
   let
     nodeEdges = edgesNodeEdges nodeId edges
     nodeInfo = NodeInfo nodeId node nodeEdges

@@ -37,19 +37,18 @@ module Source.Model
   , modelNodeDelete
   ) where
 
-import Control.Lens
-import Data.Serialize as Cereal
-import Data.EnumMap.Lazy as EnumMapL
-import Data.Set as Set
-import Data.Map as Map
-import GHC.Generics as Generic
-import Data.Functor
 import Control.Applicative
 import Control.Exception (assert)
+import Control.Lens
+import Data.Functor
+import Data.Map as Map
+import Data.Serialize as Cereal
+import Data.Set as Set
+import GHC.Generics as Generic
 
 import Source.Identifier
+import Source.Util ()
 import Source.Value
-import Source.Util
 
 data PerDirection a = PerDirection
   { _atOutward :: a
@@ -82,7 +81,7 @@ makeLenses ''Node
 
 instance Serialize Node
 
-newtype Nodes = Nodes (EnumMapL NodeId Node)
+newtype Nodes = Nodes (Map NodeId Node)
   deriving (Eq, Show, Generic)
 
 makePrisms ''Nodes
@@ -90,28 +89,28 @@ makePrisms ''Nodes
 instance Serialize Nodes
 
 nodesEmpty :: Nodes
-nodesEmpty = _Nodes # EnumMapL.empty
+nodesEmpty = _Nodes # Map.empty
 
 nodesInsert :: NodeId -> Node -> Nodes -> Nodes
 nodesInsert nodeId node = over _Nodes $
-  \nodes -> assert (EnumMapL.notMember nodeId nodes) $
-    EnumMapL.insert nodeId node nodes
+  \nodes -> assert (Map.notMember nodeId nodes) $
+    Map.insert nodeId node nodes
 
 nodesSet :: NodeId -> Node -> Nodes -> Nodes
 nodesSet nodeId node = over _Nodes $
-  \nodes -> assert (EnumMapL.member nodeId nodes) $
-    EnumMapL.insert nodeId node nodes
+  \nodes -> assert (Map.member nodeId nodes) $
+    Map.insert nodeId node nodes
 
 nodesMember :: NodeId -> Nodes -> Bool
-nodesMember nodeId nodes = EnumMapL.member nodeId (nodes ^. _Nodes)
+nodesMember nodeId nodes = Map.member nodeId (nodes ^. _Nodes)
 
 nodesLookup :: NodeId -> Nodes -> Maybe Node
-nodesLookup nodeId nodes = EnumMapL.lookup nodeId (nodes ^. _Nodes)
+nodesLookup nodeId nodes = Map.lookup nodeId (nodes ^. _Nodes)
 
 nodesDelete :: NodeId -> Nodes -> Nodes
 nodesDelete nodeId = over _Nodes $
-  \nodes -> assert (EnumMapL.member nodeId nodes) $
-    EnumMapL.delete nodeId nodes
+  \nodes -> assert (Map.member nodeId nodes) $
+    Map.delete nodeId nodes
 
 data Edge = Edge
   { _edgeSource :: NodeId

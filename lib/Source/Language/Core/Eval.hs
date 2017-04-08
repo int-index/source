@@ -3,90 +3,135 @@ module Source.Language.Core.Eval
   , reduce
   ) where
 
-import Control.Monad.State
 import Control.Exception
-import Data.Serialize as Cereal
-import GHC.Generics as Generic
+import Control.Lens
+import Control.Monad.State
+import Data.List as List
+import Data.Map as Map
 import Data.Maybe
+import Data.Serialize as Cereal
+import Data.Void
+import GHC.Generics as Generic
 
-import Source.Model
-import Source.Value
 import Source.Language.Core.Syn
+import Source.Model
+import Source.Util
 
-data UnboundVariable = UnboundVariable Var Ctx
+data UnboundVariable = UnboundVariable
   deriving (Show)
 
 instance Exception UnboundVariable
 
-data CtxElem = CtxElemExp Exp | CtxElemDummy
+data CtxElem b ref =
+  CtxElemExp (ExpNi b ref) |
+  CtxElemPadding
   deriving (Show, Eq, Generic)
 
-instance Serialize CtxElem
+instance (Serialize b, Serialize ref) => Serialize (CtxElem b ref)
 
-fromCtxElem :: Var -> CtxElem -> Exp
-fromCtxElem _ (CtxElemExp e) = e
-fromCtxElem v CtxElemDummy = ExpVar v
+fromCtxElem :: VarNi b -> CtxElem b ref -> ExpNi b ref
+fromCtxElem v = \case
+  CtxElemExp e -> e
+  CtxElemPadding -> _ExpNiVar # v
 
-newtype Ctx = Ctx [CtxElem]
-  deriving (Show, Eq, Generic)
+newtype Ctx b ref =
+  Ctx {
+    unCtx :: Map b [CtxElem b ref]
+  } deriving (Show, Eq, Generic)
 
-instance Serialize Ctx
+makePrisms ''Ctx
 
-ctxLookup :: Var -> Ctx -> Maybe CtxElem
-ctxLookup (Var n) (Ctx es) = listToMaybe $ drop (fromIntegral n) es
+instance (Ord b, Serialize b, Serialize ref) => Serialize (Ctx b ref)
 
-ctxGet :: Var -> Ctx -> Exp
+ctxLookup ::
+  Ord b =>
+  VarNi b ->
+  Ctx b ref ->
+  Maybe (CtxElem b ref)
+ctxLookup (VarNi b n) =
+  (listLookup n <=< Map.lookup b) . unCtx
+
+ctxGet ::
+  Ord b =>
+  VarNi b ->
+  Ctx b ref ->
+  ExpNi b ref
 ctxGet v ctx =
-  fromCtxElem v . fromMaybe (throw $ UnboundVariable v ctx) $
+  fromCtxElem v . fromMaybe (throw UnboundVariable) $
     ctxLookup v ctx
 
-ctxEmpty :: Ctx
-ctxEmpty = Ctx []
+ctxEmpty :: Ctx b ref
+ctxEmpty = Ctx Map.empty
 
-ctxAppend :: Exp -> Ctx -> Ctx
-ctxAppend e (Ctx es) = Ctx (CtxElemExp e:es)
+ctxAt :: Ord b => b -> Lens' (Ctx b ref) [CtxElem b ref]
+ctxAt b = _Ctx . at b . anon [] List.null
 
-ctxExtend :: Ctx -> Ctx
-ctxExtend (Ctx es) = Ctx (CtxElemDummy:es)
+ctxAppend :: Ord b => b -> ExpNi b ref -> Ctx b ref -> Ctx b ref
+ctxAppend b e = over (ctxAt b) (CtxElemExp e:)
+
+ctxExtend :: Ord b => b -> Ctx b ref -> Ctx b ref
+ctxExtend b = over (ctxAt b) (CtxElemPadding:)
 
 execute ::
   ExpId {- main action -} ->
-  Prog ->
+  Prog (BndrNi()) ExpId ->
   State Model ()
 execute _ _ = return ()
 
-reduce :: Prog -> Exp -> Exp
-reduce prog = reduce' ctxEmpty
+data ResolvingStrategy a b where
+  ResolvingStrategyRetain :: ResolvingStrategy a a {- Retain references
+  unresolved. -}
+  ResolvingStrategyLookup :: ResolvingStrategy a Void {- Lookup references and
+  continue to resolve recursively. -}
+
+reduce ::
+  forall b ref .
+  (Ord b, Ord ref) =>
+  Prog (BndrNi b) ref ->
+  ExpNi b ref ->
+  ExpNi b Void
+reduce prog = reduce' ResolvingStrategyLookup ctxEmpty
   where
-    reduce' :: Ctx -> Exp -> Exp
-    reduce' ctx = \case
-      e@ExpVal{} -> e
-      e@ExpCon{} -> e
-      ExpVar v -> ctxGet v ctx
-      ExpRef expId -> reduce' ctx $ progGet expId prog
-      ExpPrim p -> reducePrim (reduce' ctx <$> p)
-      ExpLam e -> ExpLam (reduce' (ctxExtend ctx) e)
-      -- Beta-reduction
-      f :@: a ->
-        let
-          f' = reduce' ctx f
-          a' = reduce' ctx a
-        in
-          case f' of
-            ExpLam e -> reduce' (ctxAppend a' ctx) e
-            _ -> f' :@: a'
+    reduceCaf = reduce' ResolvingStrategyRetain ctxEmpty
 
-reducePrim :: Prim Exp -> Exp
--- Integer addition.
-reducePrim (PrimAdd a b) |
-  ExpVal (ValueInteger n) <- a,
-  ExpVal (ValueInteger m) <- b =
-    ExpVal (ValueInteger (n + m))
--- Integer subtraction.
-reducePrim (PrimSubtract a b) |
-  ExpVal (ValueInteger n) <- a,
-  ExpVal (ValueInteger m) <- b =
-    ExpVal (ValueInteger (n - m))
--- Default case.
+    prog' = over (_Prog . mapped) reduceCaf prog
+
+    reduce' ::
+      forall ref' .
+      ResolvingStrategy ref ref' ->
+      Ctx b ref' ->
+      ExpNi b ref ->
+      ExpNi b ref'
+    reduce' resolvingStrategy = fix $ \descend ->
+      \ctx -> \case
+        ExpCon c -> ExpCon c
+        ExpBndr (BndrNiVar v) -> ctxGet v ctx
+        ExpRef expId ->
+          case resolvingStrategy of
+            ResolvingStrategyRetain -> ExpRef expId
+            ResolvingStrategyLookup -> descend ctx (progGet prog' expId)
+        ExpPrim p -> reducePrim (descend ctx <$> p)
+        ExpBndr (BndrNiLam b e) ->
+          let ctx' = ctxExtend b ctx
+          in ExpBndr (BndrNiLam b (descend ctx' e))
+        -- Beta-reduction
+        f :@: a ->
+          let
+            f' = descend ctx f
+            a' = descend ctx a
+            rev =
+              case resolvingStrategy of
+                ResolvingStrategyRetain -> id
+                ResolvingStrategyLookup -> vacuous
+          in
+            case f' of
+              ExpBndr (BndrNiLam b e) ->
+                descend (ctxAppend b a' ctx) (rev e)
+              _ -> f' :@: a'
+
+reducePrim :: Prim (Exp f ref) -> Exp f ref
+reducePrim (PrimAdd (ExpInteger a) (ExpInteger b)) =
+  ExpInteger (a + b)
+reducePrim (PrimSubtract (ExpInteger a) (ExpInteger b)) =
+  ExpInteger (a - b)
 reducePrim p = ExpPrim p
-
