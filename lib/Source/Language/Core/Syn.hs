@@ -5,25 +5,23 @@ module Source.Language.Core.Syn
   , _PrimValue
   , _PrimAdd
   , _PrimSubtract
-  , VarNi(..)
-  , BndrNi(..)
-  , _BndrNiVar
-  , _BndrNiLam
-  , BndrHo(..)
-  , _BndrHoVar
-  , _BndrHoLam
-  , Exp(.., ExpInteger)
+  , Var(..)
+  , BndNi(..)
+  , _BndNiVar
+  , _BndNiLam
+  , BndHo(..)
+  , _BndHoVar
+  , _BndHoLam
+  , Exp(.., ExpInteger, ExpVar, ExpLam)
   , ExpNi
   , ExpHo
   , _ExpCon
   , _ExpPrim
   , _ExpRef
   , (.:@:)
-  , _ExpBndr
-  , _ExpHoVar
-  , _ExpHoLam
-  , _ExpNiVar
-  , _ExpNiLam
+  , _ExpBnd
+  , _ExpVar
+  , _ExpLam
   , expFromP
   , lam
   , ExpId(..)
@@ -41,6 +39,7 @@ import Control.Exception
 import Control.Lens
 import Data.Constraint as Constraint
 import Data.Constraint.Lifting
+import Data.Kind
 import Data.Map as Map
 import Data.Maybe
 import Data.Serialize as Cereal
@@ -70,71 +69,91 @@ makePrisms ''Prim
 
 instance Serialize a => Serialize (Prim a)
 
-data VarNi b = VarNi b Natural
+data Var b = Var b Natural
   deriving (Show, Eq, Ord, Generic)
 
-instance Serialize b => Serialize (VarNi b)
+instance Serialize b => Serialize (Var b)
 
-instance Arbitrary b => Arbitrary (VarNi b) where
+instance Arbitrary b => Arbitrary (Var b) where
   arbitrary = genericArbitrary
   shrink = genericShrink
 
 -- | Binding structure for named variables with de Bruijn indices.
 -- "Ni" stands for "named, indexed".
-data BndrNi b a =
-  BndrNiVar (VarNi b) |
-  BndrNiLam b a
+data BndNi b a =
+  BndNiVar (Var b) |
+  BndNiLam b a
   deriving (Eq, Show, Functor, Generic)
 
-makePrisms ''BndrNi
+makePrisms ''BndNi
 
-instance (Serialize b, Serialize a) => Serialize (BndrNi b a)
+instance (Serialize b, Serialize a) => Serialize (BndNi b a)
 
-instance Eq b => Lifting Eq (BndrNi b) where
+instance Eq b => Lifting Eq (BndNi b) where
   lifting = Sub Dict
 
-instance Show b => Lifting Show (BndrNi b) where
+instance Show b => Lifting Show (BndNi b) where
   lifting = Sub Dict
 
-instance Serialize b => Lifting Serialize (BndrNi b) where
+instance Serialize b => Lifting Serialize (BndNi b) where
   lifting = Sub Dict
 
 -- | Binding structure for PHOAS.
 -- "Ho" stands for "higher-order".
-data BndrHo b a =
-  BndrHoVar b |
-  BndrHoLam (b -> a)
+data BndHo b a =
+  BndHoVar b |
+  BndHoLam (b -> a)
   deriving (Functor, Generic)
 
-makePrisms ''BndrHo
+makePrisms ''BndHo
+
+class Bnd f where
+  type BndVar f :: Type
+  type BndLam f :: Type -> Type
+  _BndVar :: Prism' (f a) (BndVar f)
+  _BndLam :: Prism' (f a) (BndLam f a)
+
+instance Bnd (BndNi b) where
+  type BndVar (BndNi b) = Var b
+  type BndLam (BndNi b) = (,) b
+  _BndVar = _BndNiVar
+  _BndLam = _BndNiLam
+
+instance Bnd (BndHo b) where
+  type BndVar (BndHo b) = b
+  type BndLam (BndHo b) = (->) b
+  _BndVar = _BndHoVar
+  _BndLam = _BndHoLam
 
 data Exp f ref =
   ExpCon ConId |
   ExpPrim (Prim (Exp f ref)) |
   ExpRef ref |
   Exp f ref :@: Exp f ref |
-  ExpBndr (f (Exp f ref))
+  ExpBnd (f (Exp f ref))
   deriving (Generic)
 
 makePrisms ''Exp
 
 deriving instance Functor f => Functor (Exp f)
 
-type ExpNi b = Exp (BndrNi b)
+type ExpNi b = Exp (BndNi b)
 
-type ExpHo b = Exp (BndrHo b)
+type ExpHo b = Exp (BndHo b)
 
-_ExpNiVar :: Prism' (ExpNi b ref) (VarNi b)
-_ExpNiVar = _ExpBndr . _BndrNiVar
+pattern ExpVar :: Bnd bnd => BndVar bnd -> Exp bnd ref
+pattern ExpVar v <- (preview _ExpVar -> Just v)
+  where ExpVar v = review _ExpVar v
 
-_ExpNiLam :: Prism' (ExpNi b ref) (b, ExpNi b ref)
-_ExpNiLam = _ExpBndr . _BndrNiLam
+pattern ExpLam :: Bnd bnd => BndLam bnd (Exp bnd ref) -> Exp bnd ref
+pattern ExpLam l <- (preview _ExpLam -> Just l)
+  where ExpLam l = review _ExpLam l
 
-_ExpHoVar :: Prism' (ExpHo b ref) b
-_ExpHoVar = _ExpBndr . _BndrHoVar
+_ExpVar :: Bnd bnd => Prism' (Exp bnd ref) (BndVar bnd)
+_ExpVar = _ExpBnd . _BndVar
 
-_ExpHoLam :: Prism' (ExpHo b ref) (b -> ExpHo b ref)
-_ExpHoLam = _ExpBndr . _BndrHoLam
+_ExpLam :: Bnd bnd => Prism' (Exp bnd ref) (BndLam bnd (Exp bnd ref))
+_ExpLam = _ExpBnd . _BndLam
 
 instance (Eq ref, Lifting Eq f) => Eq (Exp f ref) where
   (==) = geqdefault Constraint.\\
@@ -151,7 +170,7 @@ instance (Serialize ref, Lifting Serialize f) => Serialize (Exp f ref) where
     lifting @Serialize @f @(Exp f ref)
 
 lam :: (ExpHo b ref -> ExpHo b ref) -> ExpHo b ref
-lam l = ExpBndr (BndrHoLam (\x -> l (ExpBndr (BndrHoVar x))))
+lam l = ExpLam (\x -> l (ExpVar x))
 
 expFromP :: forall ref . (forall b . ExpHo b ref) -> ExpNi () ref
 expFromP e = expFromP' 0 e
@@ -162,13 +181,10 @@ expFromP e = expFromP' 0 e
       ExpPrim p -> ExpPrim (expFromP' offset <$> p)
       ExpRef expId -> ExpRef expId
       fn :@: arg -> expFromP' offset fn :@: expFromP' offset arg
-      ExpBndr b -> ExpBndr (bndrFromP b)
-      where
-        bndrFromP = \case
-          BndrHoVar v -> BndrNiVar (VarNi () (offset - v))
-          BndrHoLam f ->
-            let offset' = offset + 1
-            in BndrNiLam () (expFromP' offset' (f offset'))
+      ExpVar v -> ExpVar (Var () (offset - v))
+      ExpLam f ->
+        let offset' = offset + 1
+        in ExpLam ((), expFromP' offset' (f offset'))
 
 pattern ExpInteger :: Integer -> Exp f ref
 pattern ExpInteger n = ExpPrim (PrimValue (ValueInteger n))

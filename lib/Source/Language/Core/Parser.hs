@@ -26,7 +26,7 @@ tokPrimId t a = terminal (\case
   TokenPrimId name | nameToText name == t -> Just a
   _ -> Nothing)
 
-gProg :: Grammar r (Prod r Text Token (Prog (BndrNi Name) ExpId))
+gProg :: Grammar r (Prod r Text Token (Prog (BndNi Name) ExpId))
 gProg = mdo
   ntExpId <- rule $ tok _TokenExpId <?> "expression identifier"
   ntConId <- rule $ tok _TokenConId <?> "constructor identifier"
@@ -39,13 +39,13 @@ gProg = mdo
     review _ValueString <$> tok _TokenString <?> "value literal"
   ntVar <- rule $ tok _TokenVar <?> "variable name"
   ntLam <- rule $
-    (\n e -> _ExpNiLam # (n, e)) <$>
+    (\n e -> _ExpLam # (n, e)) <$>
     tok _TokenLam <*>
     ntExp
   ntExp' <- rule $
     review (_ExpPrim . _PrimValue) <$> ntValue <|>
     review _ExpCon <$> ntConId <|>
-    review _ExpNiVar <$> ntVar <|>
+    review _ExpVar <$> ntVar <|>
     (inBrackets _TokenParenthesis ntExp <?> "parenthesized expression")
   ntExp <- rule $
     ntExp' <|>
@@ -59,10 +59,10 @@ gProg = mdo
   ntProg <- rule $ progFromList <$> many ntDef
   return ntProg
 
-pProg :: Parser Text [Token] (Prog (BndrNi Name) ExpId)
+pProg :: Parser Text [Token] (Prog (BndNi Name) ExpId)
 pProg = parser gProg
 
-parse :: Text -> Either (Report Text [Token]) (Prog (BndrNi Name) ExpId)
+parse :: Text -> Either (Report Text [Token]) (Prog (BndNi Name) ExpId)
 parse = toEither . fullParses pProg . tokenize
   where
     toEither = \case

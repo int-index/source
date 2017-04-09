@@ -67,7 +67,7 @@ data Token =
   TokenConId ConId |
   TokenPrimId Name |
   TokenLam Name |
-  TokenVar (VarNi Name) |
+  TokenVar (Var Name) |
   TokenChar Char |
   TokenString String |
   TokenInteger Integer |
@@ -91,8 +91,8 @@ tokenRender = \case
   TokenExpId ident ->        nameToText (ident ^. _ExpId . named)
   TokenConId ident -> ":" <> nameToText (ident ^. _ConId . named)
   TokenPrimId name -> "#" <> nameToText name
-  TokenLam name -> nameToText name <> ">"
-  TokenVar (VarNi b n) ->
+  TokenLam name -> ">" <> nameToText name
+  TokenVar (Var b n) ->
     Text.replicate (fromIntegral n + 1) "^" <>
     nameToText b
   TokenChar c -> _Text . _Show # c
@@ -142,7 +142,7 @@ pSkip = skipMany (void spaceChar <|> pComment)
 pToken' :: Lexer Token
 pToken' = choice [
   pPunct,
-  TokenLam <$> try pLam,
+  TokenLam <$> pLam,
   TokenInteger <$> pInteger,
   TokenConId <$> pConId,
   TokenExpId <$> pExpId,
@@ -194,13 +194,13 @@ pPrimId :: Lexer Name
 pPrimId = char '#' *> pName
 
 pLam :: Lexer Name
-pLam = pName <* char '>'
+pLam = char '>' *> pName
 
-pVar :: Lexer (VarNi Name)
+pVar :: Lexer (Var Name)
 pVar = char '^' *> do
   k <- fromIntegral . List.length <$> many (char '^')
   b <- pName
-  pure (VarNi b k)
+  pure (Var b k)
 
 pString :: Lexer String
 pString =

@@ -35,7 +35,7 @@ lexerOutputSample1 = [
 parserInputSample1 :: Text
 parserInputSample1 = "n = -13. m= 42.\nk =+7. p=0."
 
-parserOutputSample1 :: Prog (BndrNi Name) ExpId
+parserOutputSample1 :: Prog (BndNi Name) ExpId
 parserOutputSample1 = progFromList [
   intDef "n" -13, intDef "m" 42, intDef "k" 7, intDef "p" 0 ]
   where
@@ -46,18 +46,18 @@ parserOutputSample1 = progFromList [
 parserInputSample2 :: Text
 parserInputSample2 = "exp = :cons (:up 'a') ^^bound."
 
-parserOutputSample2 :: Prog (BndrNi Name) ExpId
+parserOutputSample2 :: Prog (BndNi Name) ExpId
 parserOutputSample2 = progFromList [
   ( _ExpId . named # unsafeStringToName "exp",
     (_ExpCon . _ConId . named # unsafeStringToName "cons") :@:
     ( (_ExpCon . _ConId . named # unsafeStringToName "up") :@:
       (_ExpPrim . _PrimValue . _ValueChar # 'a') ) :@:
-    (_ExpNiVar # VarNi (unsafeStringToName "bound") 1) ) ]
+    (_ExpVar # Var (unsafeStringToName "bound") 1) ) ]
 
 parserInputSample3 :: Text
 parserInputSample3 = "exp = #add 5 (#subtract :with -3)."
 
-parserOutputSample3 :: Prog (BndrNi Name) ExpId
+parserOutputSample3 :: Prog (BndNi Name) ExpId
 parserOutputSample3 = progFromList [
   ( _ExpId . named # unsafeStringToName "exp",
     ExpPrim (PrimAdd
@@ -70,17 +70,17 @@ parserOutputSample3 = progFromList [
 parserInputSample4 :: Text
 parserInputSample4 =
   " exp =           \
-  \   a> b>         \
+  \   >a >b         \
   \     #add ^a ^b. "
 
-parserOutputSample4 :: Prog (BndrNi Name) ExpId
+parserOutputSample4 :: Prog (BndNi Name) ExpId
 parserOutputSample4 = progFromList [
   ( _ExpId . named # unsafeStringToName "exp",
-    _ExpNiLam # (unsafeStringToName "a",
-      _ExpNiLam # (unsafeStringToName "b",
+    _ExpLam # (unsafeStringToName "a",
+      _ExpLam # (unsafeStringToName "b",
         ExpPrim (PrimAdd
-          (_ExpNiVar # VarNi (unsafeStringToName "a") 0)
-          (_ExpNiVar # VarNi (unsafeStringToName "b") 0)
+          (_ExpVar # Var (unsafeStringToName "a") 0)
+          (_ExpVar # Var (unsafeStringToName "b") 0)
         ))
     )
   ) ]

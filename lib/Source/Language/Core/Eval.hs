@@ -29,10 +29,10 @@ data CtxElem b ref =
 
 instance (Serialize b, Serialize ref) => Serialize (CtxElem b ref)
 
-fromCtxElem :: VarNi b -> CtxElem b ref -> ExpNi b ref
+fromCtxElem :: Var b -> CtxElem b ref -> ExpNi b ref
 fromCtxElem v = \case
   CtxElemExp e -> e
-  CtxElemPadding -> _ExpNiVar # v
+  CtxElemPadding -> _ExpVar # v
 
 newtype Ctx b ref =
   Ctx {
@@ -45,15 +45,15 @@ instance (Ord b, Serialize b, Serialize ref) => Serialize (Ctx b ref)
 
 ctxLookup ::
   Ord b =>
-  VarNi b ->
+  Var b ->
   Ctx b ref ->
   Maybe (CtxElem b ref)
-ctxLookup (VarNi b n) =
+ctxLookup (Var b n) =
   (listLookup n <=< Map.lookup b) . unCtx
 
 ctxGet ::
   Ord b =>
-  VarNi b ->
+  Var b ->
   Ctx b ref ->
   ExpNi b ref
 ctxGet v ctx =
@@ -74,7 +74,7 @@ ctxExtend b = over (ctxAt b) (CtxElemPadding:)
 
 execute ::
   ExpId {- main action -} ->
-  Prog (BndrNi()) ExpId ->
+  Prog (BndNi()) ExpId ->
   State Model ()
 execute _ _ = return ()
 
@@ -87,7 +87,7 @@ data ResolvingStrategy a b where
 reduce ::
   forall b ref .
   (Ord b, Ord ref) =>
-  Prog (BndrNi b) ref ->
+  Prog (BndNi b) ref ->
   ExpNi b ref ->
   ExpNi b Void
 reduce prog = reduce' ResolvingStrategyLookup ctxEmpty
@@ -103,15 +103,15 @@ reduce prog = reduce' ResolvingStrategyLookup ctxEmpty
     reduce' resolvingStrategy = fix $ \descend ->
       \ctx -> \case
         ExpCon c -> ExpCon c
-        ExpBndr (BndrNiVar v) -> ctxGet v ctx
+        ExpVar v -> ctxGet v ctx
         ExpRef expId ->
           case resolvingStrategy of
             ResolvingStrategyRetain -> ExpRef expId
             ResolvingStrategyLookup -> descend ctx (progGet prog' expId)
         ExpPrim p -> reducePrim (descend ctx <$> p)
-        ExpBndr (BndrNiLam b e) ->
+        ExpLam (b, e) ->
           let ctx' = ctxExtend b ctx
-          in ExpBndr (BndrNiLam b (descend ctx' e))
+          in ExpLam (b, descend ctx' e)
         -- Beta-reduction
         f :@: a ->
           let
@@ -123,7 +123,7 @@ reduce prog = reduce' ResolvingStrategyLookup ctxEmpty
                 ResolvingStrategyLookup -> vacuous
           in
             case f' of
-              ExpBndr (BndrNiLam b e) ->
+              ExpLam (b, e) ->
                 descend (ctxAppend b a' ctx) (rev e)
               _ -> f' :@: a'
 
