@@ -35,7 +35,7 @@ lexerOutputSample1 = [
 parserInputSample1 :: Text
 parserInputSample1 = "n = -13. m= 42.\nk =+7. p=0."
 
-parserOutputSample1 :: Prog (BndrNi ()) ExpId
+parserOutputSample1 :: Prog (BndrNi Name) ExpId
 parserOutputSample1 = progFromList [
   intDef "n" -13, intDef "m" 42, intDef "k" 7, intDef "p" 0 ]
   where
@@ -44,15 +44,46 @@ parserOutputSample1 = progFromList [
         _ExpPrim . _PrimValue . _ValueInteger # n )
 
 parserInputSample2 :: Text
-parserInputSample2 = "exp = :cons (:up 'a') ^0."
+parserInputSample2 = "exp = :cons (:up 'a') ^^bound."
 
-parserOutputSample2 :: Prog (BndrNi ()) ExpId
+parserOutputSample2 :: Prog (BndrNi Name) ExpId
 parserOutputSample2 = progFromList [
   ( _ExpId . named # unsafeStringToName "exp",
     (_ExpCon . _ConId . named # unsafeStringToName "cons") :@:
     ( (_ExpCon . _ConId . named # unsafeStringToName "up") :@:
       (_ExpPrim . _PrimValue . _ValueChar # 'a') ) :@:
-    (_ExpNiVar # VarNi () 0) ) ]
+    (_ExpNiVar # VarNi (unsafeStringToName "bound") 1) ) ]
+
+parserInputSample3 :: Text
+parserInputSample3 = "exp = #add 5 (#subtract :with -3)."
+
+parserOutputSample3 :: Prog (BndrNi Name) ExpId
+parserOutputSample3 = progFromList [
+  ( _ExpId . named # unsafeStringToName "exp",
+    ExpPrim (PrimAdd
+      (ExpInteger 5)
+      (ExpPrim (PrimSubtract
+        (_ExpCon . _ConId . named # unsafeStringToName "with")
+        (ExpInteger -3))))
+  ) ]
+
+parserInputSample4 :: Text
+parserInputSample4 =
+  " exp =           \
+  \   a> b>         \
+  \     #add ^a ^b. "
+
+parserOutputSample4 :: Prog (BndrNi Name) ExpId
+parserOutputSample4 = progFromList [
+  ( _ExpId . named # unsafeStringToName "exp",
+    _ExpNiLam # (unsafeStringToName "a",
+      _ExpNiLam # (unsafeStringToName "b",
+        ExpPrim (PrimAdd
+          (_ExpNiVar # VarNi (unsafeStringToName "a") 0)
+          (_ExpNiVar # VarNi (unsafeStringToName "b") 0)
+        ))
+    )
+  ) ]
 
 expChurchInt :: Int -> ExpHo b ref
 expChurchInt n =
@@ -79,10 +110,14 @@ testLanguage = testGroup "Language" [
     testCase "handles sample-1" $
       parse parserInputSample1 @?= Right parserOutputSample1,
     testCase "handles sample-2" $
-      parse parserInputSample2 @?= Right parserOutputSample2 ],
+      parse parserInputSample2 @?= Right parserOutputSample2,
+    testCase "handles sample-3" $
+      parse parserInputSample3 @?= Right parserOutputSample3,
+    testCase "handles sample-4" $
+      parse parserInputSample4 @?= Right parserOutputSample4 ],
   testGroup "Evaluation" [
     testProperty "handles church-encoded" $
       \(Positive n) k ->
-        reduce progEmpty (expFromP @() (expChurchInt' n k)) ==
+        reduce progEmpty (expFromP @Name (expChurchInt' n k)) ==
         ExpInteger (fromIntegral n + k)
     ] ]

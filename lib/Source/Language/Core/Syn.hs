@@ -49,6 +49,7 @@ import Generics.Deriving.Show
 import GHC.Generics as Generic
 import Numeric.Natural
 import Test.QuickCheck as QC
+import Test.QuickCheck.Arbitrary.Generic
 
 import Source.Identifier
 import Source.Util ()
@@ -70,9 +71,13 @@ makePrisms ''Prim
 instance Serialize a => Serialize (Prim a)
 
 data VarNi b = VarNi b Natural
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
 
 instance Serialize b => Serialize (VarNi b)
+
+instance Arbitrary b => Arbitrary (VarNi b) where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
 
 -- | Binding structure for named variables with de Bruijn indices.
 -- "Ni" stands for "named, indexed".
@@ -186,7 +191,9 @@ instance (Ord ref, Show ref, Lifting Show f) => Show (Prog f ref) where
   showsPrec = gshowsPrecdefault Constraint.\\
     lifting @Show @f @(Prog f ref)
 
-instance (Ord ref, Serialize ref, Lifting Serialize f) => Serialize (Prog f ref) where
+instance
+  (Ord ref, Serialize ref, Lifting Serialize f) =>
+    Serialize (Prog f ref) where
   put = Cereal.gPut . Generic.from Constraint.\\
     lifting @Serialize @f @(Prog f ref)
   get = Generic.to <$> Cereal.gGet Constraint.\\

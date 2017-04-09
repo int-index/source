@@ -5,6 +5,7 @@ module Source.Language.Core.Lexer
   , Token(..)
   , _TokenExpId
   , _TokenConId
+  , _TokenLam
   , _TokenVar
   , _TokenChar
   , _TokenString
@@ -14,6 +15,7 @@ module Source.Language.Core.Lexer
   , _TokenComma
   , _TokenDot
   , _TokenEquals
+  , _TokenBar
   , _TokenUnknown
   , tokenize
   , tokenize'
@@ -63,7 +65,9 @@ instance Arbitrary UnknownChar where
 data Token =
   TokenExpId ExpId |
   TokenConId ConId |
-  TokenVar Natural |
+  TokenPrimId Name |
+  TokenLam Name |
+  TokenVar (VarNi Name) |
   TokenChar Char |
   TokenString String |
   TokenInteger Integer |
@@ -72,6 +76,7 @@ data Token =
   TokenComma |
   TokenDot |
   TokenEquals |
+  TokenBar |
   TokenUnknown UnknownChar
   deriving (Eq, Ord, Show, Generic)
 
@@ -85,7 +90,11 @@ tokenRender :: Token -> Text
 tokenRender = \case
   TokenExpId ident ->        nameToText (ident ^. _ExpId . named)
   TokenConId ident -> ":" <> nameToText (ident ^. _ConId . named)
-  TokenVar v -> "^" <> _Text . _Show # v
+  TokenPrimId name -> "#" <> nameToText name
+  TokenLam name -> nameToText name <> ">"
+  TokenVar (VarNi b n) ->
+    Text.replicate (fromIntegral n + 1) "^" <>
+    nameToText b
   TokenChar c -> _Text . _Show # c
   TokenString s -> _Text . _Show # s
   TokenInteger n -> _Text . _Show # n
@@ -94,6 +103,7 @@ tokenRender = \case
   TokenComma -> ","
   TokenDot -> "."
   TokenEquals -> "="
+  TokenBar -> "|"
   TokenUnknown (UnknownChar c) -> Text.singleton c
 
 detokenize :: [Token] -> Text
@@ -132,9 +142,11 @@ pSkip = skipMany (void spaceChar <|> pComment)
 pToken' :: Lexer Token
 pToken' = choice [
   pPunct,
+  TokenLam <$> try pLam,
   TokenInteger <$> pInteger,
   TokenConId <$> pConId,
   TokenExpId <$> pExpId,
+  TokenPrimId <$> pPrimId,
   TokenVar <$> pVar,
   TokenString <$> pString,
   TokenChar <$> pChar ] <?> "token"
@@ -147,7 +159,8 @@ pPunct =
   char ')' $> TokenParenthesis BracketSideClosing <|>
   char ',' $> TokenComma <|>
   char '.' $> TokenDot <|>
-  char '=' $> TokenEquals
+  char '=' $> TokenEquals <|>
+  char '|' $> TokenBar
 
 pInteger :: Lexer Integer
 pInteger = pSign <*> (toInteger <$> pNatural)
@@ -168,17 +181,26 @@ pNatural = digitsToNumber <$> some pDigit
 closing :: Lexer a -> Lexer ()
 closing p = void p <|> eof
 
-pName :: Lexer Identifier
-pName = nameToIdentifier . unsafeStringToName <$> some (oneOf alphabet)
+pName :: Lexer Name
+pName = unsafeStringToName <$> some (oneOf alphabet)
 
 pExpId :: Lexer ExpId
-pExpId = ExpId <$> pName
+pExpId = ExpId . nameToIdentifier <$> pName
 
 pConId :: Lexer ConId
-pConId = ConId <$> (char ':' *> pName)
+pConId = ConId . nameToIdentifier <$> (char ':' *> pName)
 
-pVar :: Lexer Natural
-pVar = char '^' *> pNatural
+pPrimId :: Lexer Name
+pPrimId = char '#' *> pName
+
+pLam :: Lexer Name
+pLam = pName <* char '>'
+
+pVar :: Lexer (VarNi Name)
+pVar = char '^' *> do
+  k <- fromIntegral . List.length <$> many (char '^')
+  b <- pName
+  pure (VarNi b k)
 
 pString :: Lexer String
 pString =

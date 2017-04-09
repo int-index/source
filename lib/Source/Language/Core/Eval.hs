@@ -93,9 +93,7 @@ reduce ::
 reduce prog = reduce' ResolvingStrategyLookup ctxEmpty
   where
     reduceCaf = reduce' ResolvingStrategyRetain ctxEmpty
-
     prog' = over (_Prog . mapped) reduceCaf prog
-
     reduce' ::
       forall ref' .
       ResolvingStrategy ref ref' ->
