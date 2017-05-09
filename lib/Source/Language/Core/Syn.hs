@@ -43,8 +43,6 @@ import Data.Kind
 import Data.Map as Map
 import Data.Maybe
 import Data.Serialize as Cereal
-import Generics.Deriving.Eq
-import Generics.Deriving.Show
 import GHC.Generics as Generic
 import Numeric.Natural
 import Test.QuickCheck as QC
@@ -62,12 +60,17 @@ makePrisms ''ConId
 data Prim a =
   PrimValue Value {- value constant -} |
   PrimAdd      a a {- integer addition -} |
-  PrimSubtract a a {- integer subtraction -}
-  deriving (Show, Eq, Functor, Generic)
+  PrimSubtract a a {- integer subtraction -} |
+  PrimWithNat  a a a {- natural number eliminator -}
+  deriving (Show, Eq, Functor, Foldable, Traversable, Generic)
 
 makePrisms ''Prim
 
 instance Serialize a => Serialize (Prim a)
+
+instance Arbitrary a => Arbitrary (Prim a) where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
 
 data Var b = Var b Natural
   deriving (Show, Eq, Ord, Generic)
@@ -88,6 +91,10 @@ data BndNi b a =
 makePrisms ''BndNi
 
 instance (Serialize b, Serialize a) => Serialize (BndNi b a)
+
+instance (Arbitrary b, Arbitrary a) => Arbitrary (BndNi b a) where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
 
 instance Eq b => Lifting Eq (BndNi b) where
   lifting = Sub Dict
@@ -139,6 +146,10 @@ deriving instance Functor f => Functor (Exp f)
 
 type ExpNi b = Exp (BndNi b)
 
+instance (Arbitrary b, Arbitrary ref) => Arbitrary (ExpNi b ref) where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
+
 type ExpHo b = Exp (BndHo b)
 
 pattern ExpVar :: Bnd bnd => BndVar bnd -> Exp bnd ref
@@ -155,13 +166,9 @@ _ExpVar = _ExpBnd . _BndVar
 _ExpLam :: Bnd bnd => Prism' (Exp bnd ref) (BndLam bnd (Exp bnd ref))
 _ExpLam = _ExpBnd . _BndLam
 
-instance (Eq ref, Lifting Eq f) => Eq (Exp f ref) where
-  (==) = geqdefault Constraint.\\
-    lifting @Eq @f @(Exp f ref)
+deriving instance (Eq ref, Eq (f (Exp f ref))) => Eq (Exp f ref)
 
-instance (Show ref, Lifting Show f) => Show (Exp f ref) where
-  showsPrec = gshowsPrecdefault Constraint.\\
-    lifting @Show @f @(Exp f ref)
+deriving instance (Show ref, Show (f (Exp f ref))) => Show (Exp f ref)
 
 instance (Serialize ref, Lifting Serialize f) => Serialize (Exp f ref) where
   put = Cereal.gPut . Generic.from Constraint.\\
@@ -199,13 +206,9 @@ newtype Prog f ref = Prog (Map ref (Exp f ref))
 
 makePrisms ''Prog
 
-instance (Ord ref, Eq ref, Lifting Eq f) => Eq (Prog f ref) where
-  (==) = geqdefault Constraint.\\
-    lifting @Eq @f @(Prog f ref)
+deriving instance (Ord ref, Eq ref, Eq (f (Exp f ref))) => Eq (Prog f ref)
 
-instance (Ord ref, Show ref, Lifting Show f) => Show (Prog f ref) where
-  showsPrec = gshowsPrecdefault Constraint.\\
-    lifting @Show @f @(Prog f ref)
+deriving instance (Ord ref, Show ref, Show (f (Exp f ref))) => Show (Prog f ref)
 
 instance
   (Ord ref, Serialize ref, Lifting Serialize f) =>

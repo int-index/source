@@ -35,7 +35,7 @@ instance Ord Name where
 
 instance Arbitrary Name where
   arbitrary = do
-    len <- choose (1, 1000)
+    len <- sized $ \n -> choose (1, 1 + n)
     unsafeStringToName <$>
       vectorOf len (QC.elements alphabet)
   shrink = \case

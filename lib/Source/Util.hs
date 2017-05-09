@@ -16,8 +16,6 @@ import Data.IORef
 import Data.Maybe
 import Data.Serialize as Cereal
 import Data.Tuple
-import Generics.Deriving.Eq
-import Generics.Deriving.Show
 import Numeric.Natural
 
 type EnumMapL = EnumMapL.EnumMap
@@ -40,9 +38,3 @@ instance
     Serialize (EnumMapL k a) where
   put = Cereal.put . EnumMapL.toAscList
   get = EnumMapL.fromDistinctAscList <$> Cereal.get
-
-instance {-# OVERLAPPABLE #-} Eq a => GEq a where
-  geq = (==)
-
-instance {-# OVERLAPPABLE #-} Show a => GShow a where
-  gshowsPrec = showsPrec

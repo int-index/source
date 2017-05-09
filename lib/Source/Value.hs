@@ -15,6 +15,7 @@ import Data.Bool
 import Data.Serialize as Cereal
 import Data.String
 import GHC.Generics (Generic)
+import Test.QuickCheck.Arbitrary.Generic
 
 data Value
   = ValueInteger Integer
@@ -28,6 +29,10 @@ _ValueString :: Prism' Value String
 _ValueString = _ValueList . below _ValueChar
 
 instance Serialize Value
+
+instance Arbitrary Value where
+  arbitrary = genericArbitrary
+  shrink = genericShrink
 
 data ValueInvalid = ValueInvalid
   deriving (Show)

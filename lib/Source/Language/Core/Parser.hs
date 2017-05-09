@@ -32,7 +32,8 @@ gProg = mdo
   ntConId <- rule $ tok _TokenConId <?> "constructor identifier"
   ntPrim <- rule $
     tokPrimId "add" PrimAdd <*> ntExp' <*> ntExp' <|>
-    tokPrimId "subtract" PrimSubtract <*> ntExp' <*> ntExp'
+    tokPrimId "subtract" PrimSubtract <*> ntExp' <*> ntExp' <|>
+    tokPrimId "withnat" PrimWithNat <*> ntExp' <*> ntExp' <*> ntExp'
   ntValue <- rule $
     review _ValueInteger <$> tok _TokenInteger <|>
     review _ValueChar <$> tok _TokenChar <|>
@@ -44,13 +45,16 @@ gProg = mdo
     ntExp
   ntExp' <- rule $
     review (_ExpPrim . _PrimValue) <$> ntValue <|>
+    review _ExpRef <$> ntExpId <|>
     review _ExpCon <$> ntConId <|>
     review _ExpVar <$> ntVar <|>
     (inBrackets _TokenParenthesis ntExp <?> "parenthesized expression")
-  ntExp <- rule $
+  ntExpWithoutLam <- rule $
     ntExp' <|>
-    (:@:) <$> ntExp <*> ntExp' <|>
-    review _ExpPrim <$> ntPrim <|>
+    (:@:) <$> ntExpWithoutLam <*> ntExp' <|>
+    review _ExpPrim <$> ntPrim
+  ntExp <- rule $
+    ntExpWithoutLam <|>
     (ntLam <?> "lambda function")
   ntDef <- rule $
     (,) <$>

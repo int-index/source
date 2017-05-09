@@ -11,10 +11,10 @@ import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
 import Source.Identifier
+import Source.Language.Core.Eval
 import Source.Language.Core.Lexer
 import Source.Language.Core.Parser
 import Source.Language.Core.Syn
-import Source.Language.Core.Eval
 import Source.Value
 
 lexerInputSample1 :: Text
@@ -85,6 +85,26 @@ parserOutputSample4 = progFromList [
     )
   ) ]
 
+evaluationInputSample1' :: Text
+evaluationInputSample1' =
+  " church = >k >a                          \
+  \   #withnat ^k (church (#add ^k ^k)) ^a. \
+  \ a = church +1 +8.                       "
+
+evaluationInputSample1 :: Prog (BndNi Name) ExpId
+Right evaluationInputSample1 = parse evaluationInputSample1'
+
+evaluationInputSample2' :: Text
+evaluationInputSample2' =
+  " church = >f >a                        \
+  \   withnat ^a (church ^f (^f ^a)).     \
+  \ withnat = >z >s >a #withnat ^z ^s ^a. \
+  \ double = >a #add ^a ^a.               \
+  \ a = church double +3 +8.              "
+
+evaluationInputSample2 :: Prog (BndNi Name) ExpId
+Right evaluationInputSample2 = parse evaluationInputSample2'
+
 expChurchInt :: Int -> ExpHo b ref
 expChurchInt n =
   lam $ \f ->
@@ -96,6 +116,9 @@ expChurchInt' n k =
   expChurchInt n :@: eAdd :@: ExpInteger k
   where
     eAdd = lam $ \a -> ExpPrim (PrimAdd (ExpInteger 1) a)
+
+refZero :: Exp bnd ExpId
+refZero = ExpRef (ExpId (identifierZero))
 
 testLanguage :: TestTree
 testLanguage = testGroup "Language" [
@@ -119,5 +142,9 @@ testLanguage = testGroup "Language" [
     testProperty "handles church-encoded" $
       \(Positive n) k ->
         reduce progEmpty (expFromP @Name (expChurchInt' n k)) ==
-        ExpInteger (fromIntegral n + k)
+        ExpInteger (fromIntegral n + k),
+    testCase "handles sample-1" $
+      reduce evaluationInputSample1 refZero @?= ExpInteger 256,
+    testCase "handles sample-2" $
+      reduce evaluationInputSample2 refZero @?= ExpInteger (256 * 3)
     ] ]

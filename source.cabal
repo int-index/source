@@ -22,8 +22,7 @@ library
 
   build-depends:       base, text, bytestring, cereal, containers,
                        enummapset-th, mtl, lens, Earley, megaparsec,
-                       QuickCheck, generic-arbitrary, generic-deriving,
-                       constraints
+                       QuickCheck, generic-arbitrary, constraints
 
   default-language:    Haskell2010
   default-extensions:  BangPatterns
