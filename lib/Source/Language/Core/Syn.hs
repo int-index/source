@@ -12,7 +12,7 @@ module Source.Language.Core.Syn
   , BndHo(..)
   , _BndHoVar
   , _BndHoLam
-  , Exp(.., ExpInteger, ExpVar, ExpLam)
+  , Exp(.., ExpVar, ExpLam, ExpInteger)
   , ExpNi
   , ExpHo
   , _ExpCon
@@ -22,6 +22,7 @@ module Source.Language.Core.Syn
   , _ExpBnd
   , _ExpVar
   , _ExpLam
+  , _ExpInteger
   , expFromP
   , lam
   , ExpId(..)
@@ -193,8 +194,12 @@ expFromP e = expFromP' 0 e
         let offset' = offset + 1
         in ExpLam ((), expFromP' offset' (f offset'))
 
+_ExpInteger :: Prism' (Exp f ref) Integer
+_ExpInteger = _ExpPrim . _PrimValue . _ValueInteger
+
 pattern ExpInteger :: Integer -> Exp f ref
-pattern ExpInteger n = ExpPrim (PrimValue (ValueInteger n))
+pattern ExpInteger a <- (preview _ExpInteger -> Just a)
+  where ExpInteger a = review _ExpInteger a
 
 newtype ExpId = ExpId Identifier
   deriving (Eq, Ord, Enum, Show, Serialize, Arbitrary)

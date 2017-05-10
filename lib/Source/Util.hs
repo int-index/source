@@ -6,9 +6,12 @@ module Source.Util
   , atomicRunStateIORef'
   , toposort
   , listLookup
+  , unit
+  , maybeThrowError
   ) where
 
 import Control.Monad.State
+import Control.Monad.Except
 import Data.EnumMap.Lazy as EnumMapL
 import Data.EnumMap.Strict as EnumMapS
 import Data.Graph (stronglyConnComp, flattenSCCs)
@@ -38,3 +41,9 @@ instance
     Serialize (EnumMapL k a) where
   put = Cereal.put . EnumMapL.toAscList
   get = EnumMapL.fromDistinctAscList <$> Cereal.get
+
+unit :: a -> () -> a
+unit = const
+
+maybeThrowError :: MonadError e m => e -> Maybe a -> m a
+maybeThrowError e = maybe (throwError e) pure

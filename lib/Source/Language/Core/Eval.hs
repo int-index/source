@@ -6,6 +6,7 @@ module Source.Language.Core.Eval
 import Control.Exception
 import Control.Lens
 import Control.Monad
+import Control.Monad.Except
 import Control.Monad.ST
 import Control.Monad.State
 import Data.Bool
@@ -18,6 +19,7 @@ import Prelude hiding (exp)
 
 import Source.Language.Core.Syn
 import Source.Model
+import Source.Util
 
 data UnboundVariable = UnboundVariable
   deriving (Show)
@@ -29,18 +31,6 @@ execute ::
   Prog (BndNi b) ExpId ->
   State Model ()
 execute _ _ = return ()
-
-reducePrim :: Prim (Exp f ref) -> Maybe (Exp f ref)
-reducePrim (PrimAdd (ExpInteger a) (ExpInteger b)) =
-  Just $ ExpInteger (a + b)
-reducePrim (PrimSubtract (ExpInteger a) (ExpInteger b)) =
-  Just $ ExpInteger (a - b)
-reducePrim (PrimWithNat onZero onSucc (ExpInteger a)) | a >= 0 =
-  Just $
-    case a of
-      0 -> onZero
-      _ -> onSucc :@: ExpInteger (a - 1)
-reducePrim _ = Nothing
 
 type ExpNiST' b s = ExpNi b (STRef s (ExpNiST b s))
 
@@ -90,12 +80,7 @@ reduceST = \case
     ExpNiST exp <- readSTRef expRef
     exp' <- reduceST exp
     exp' <$ writeSTRef expRef (ExpNiST exp')
-  ExpPrim p -> do
-    p' <- traverse reduceST p
-    maybe
-      (pure (ExpPrim p'))
-      reduceST
-      (reducePrim p')
+  ExpPrim p -> reducePrimST p
   ExpLam e -> pure (ExpLam e)
   -- Beta-reduction
   f :@: a -> do
@@ -107,6 +92,35 @@ reduceST = \case
           _        -> newSTRef (ExpNiST a)
         reduceST $ substST b 0 a' e
       _ -> pure (f' :@: a)
+
+reducePrimST ::
+  Eq b =>
+  Prim (ExpNiST' b s) ->
+  ST s (ExpNiST' b s)
+reducePrimST p = fmap defaultCase . runExceptT $ do
+  case p of
+    PrimValue{} -> throwError ()
+    PrimAdd a b -> integerBinOp (+) a b
+    PrimSubtract a b -> integerBinOp (-) a b
+    PrimWithNat onZero onSucc a -> do
+      a' <- match (^? _ExpInteger) a
+      e <- case compare a' 0 of
+        LT -> throwError ()
+        EQ -> pure onZero
+        GT -> pure $ onSucc :@: (_ExpInteger # pred a')
+      lift (reduceST e)
+  where
+
+    defaultCase = either (unit (ExpPrim p)) id
+
+    match f e = do
+      a <- lift (reduceST e)
+      maybeThrowError () (f a)
+
+    integerBinOp f a b = do
+      a' <- match (^? _ExpInteger) a
+      b' <- match (^? _ExpInteger) b
+      pure $ _ExpInteger # (f a' b')
 
 substST
   :: Eq b
