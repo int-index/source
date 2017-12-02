@@ -31,11 +31,13 @@ import Data.Maybe
 import Data.Monoid
 import Data.Text as Text
 import Data.Text.Lens
+import Data.Void
 import GHC.Generics (Generic)
 import Numeric.Natural
 import Test.QuickCheck.Arbitrary.Generic
 import Text.Megaparsec hiding (Token)
-import Text.Megaparsec.Lexer (charLiteral)
+import Text.Megaparsec.Char
+import Text.Megaparsec.Char.Lexer (charLiteral)
 
 import Source.Identifier
 import Source.Language.Core.Syn
@@ -109,17 +111,7 @@ tokenRender = \case
 detokenize :: [Token] -> Text
 detokenize = Text.unwords . List.map tokenRender
 
-data DiscardErr = DiscardErr
-  deriving (Eq, Ord, Show, Generic)
-
-instance ErrorComponent DiscardErr where
-  representFail _ = DiscardErr
-  representIndentation _ _ _ = DiscardErr
-
-instance ShowErrorComponent DiscardErr where
-  showErrorComponent = show
-
-type Lexer a = Parsec DiscardErr Text a
+type Lexer a = Parsec Void Text a
 
 tokenize :: Text -> [Token]
 tokenize = fromMaybe noTokenErr . tokenize'

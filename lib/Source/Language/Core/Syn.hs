@@ -50,8 +50,8 @@ import Test.QuickCheck as QC
 import Test.QuickCheck.Arbitrary.Generic
 
 import Source.Identifier
-import Source.Util ()
 import Source.Value
+import Source.Util ()
 
 newtype ConId = ConId Identifier
   deriving (Eq, Ord, Enum, Show, Serialize, Arbitrary)

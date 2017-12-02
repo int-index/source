@@ -1,6 +1,7 @@
 packages:
 - '.'
-
-resolver: nightly-2017-05-07
+resolver: nightly-2017-12-01
 extra-deps:
-- generic-arbitrary-0.1.0
+- enummapset-th-0.6.1.1
+- vty-5.18
+- terminfo-0.4.1.0

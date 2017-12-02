@@ -21,6 +21,8 @@ import GHC.TypeLits
 import Numeric.Natural
 import Test.QuickCheck as QC
 
+import Source.Util ()
+
 alphabet :: [Char]
 alphabet = "abcdefghijklmnopqrstuvwxyz"
 
@@ -56,7 +58,6 @@ nameToString (Name s) = s
 nameToText :: Name -> Text
 nameToText = Text.pack . nameToString
 
--- Invariant: n >= 0
 newtype Identifier = Identifier Natural
   deriving (Eq, Ord, Show, Serialize, Arbitrary)
 

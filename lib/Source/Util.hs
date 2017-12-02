@@ -20,6 +20,7 @@ import Data.Maybe
 import Data.Serialize as Cereal
 import Data.Tuple
 import Numeric.Natural
+import Test.QuickCheck as QC
 
 type EnumMapL = EnumMapL.EnumMap
 type EnumMapS = EnumMapS.EnumMap
@@ -41,6 +42,10 @@ instance
     Serialize (EnumMapL k a) where
   put = Cereal.put . EnumMapL.toAscList
   get = EnumMapL.fromDistinctAscList <$> Cereal.get
+
+instance Arbitrary Natural where
+  arbitrary = arbitrarySizedNatural
+  shrink = shrinkIntegral
 
 unit :: a -> () -> a
 unit = const

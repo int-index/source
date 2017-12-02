@@ -10,6 +10,7 @@ library
                        Source.Value
                        Source.Model
                        Source.Edit
+                       Source.Subspace
                        Source.Protocol
                        Source.Protocol.Handle
                        Source.Language.Core.Syn
@@ -123,7 +124,7 @@ executable source-client
                        Source.Client.Render.Layout
                        Source.Client.State
 
-  build-depends:       base, source, containers, enummapset-th, mtl, lens, vty,
+  build-depends:       base, source, containers, enummapset-th, mtl, lens, vty == 5.18,
                        network
 
   default-language:    Haskell2010
