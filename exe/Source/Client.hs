@@ -16,6 +16,7 @@ import Control.Lens
 import Control.Exception (bracket, finally)
 import Graphics.Vty as Vty
 
+import Slay.Core
 import Source.Model as Source
 import Source.Value
 import Source.Edit
@@ -90,10 +91,11 @@ updateCursor ::
 updateCursor (x, y) updCur clientState = do
   clientState ^. clientStateCursorId <&> \cursorId ->
     let
+      point = Offset x y
       mOldCursor = modelCursorLookup cursorId (clientState ^. clientStateModel)
       defaultCursor = Map.empty
       baseCursor = fromMaybe defaultCursor mOldCursor
-      mNodeId = (clientState ^. clientStatePtrNodeId) (x, y)
+      mNodeId = (clientState ^. clientStatePtrNodeId) point
       cursorPart = case updCur of
         UpdateCursorTo -> "to"
         UpdateCursorFrom -> "from"

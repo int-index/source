@@ -1,6 +1,7 @@
 module Source.Client.Render
-  ( renderModel
-  , EnableIdentifiersResolution(..)
+  ( renderModel,
+    EnableIdentifiersResolution(..),
+    ActiveZone(..)
   ) where
 
 import Control.Lens
@@ -8,97 +9,46 @@ import Data.List as List
 import Data.List.NonEmpty as NonEmpty
 import Data.Map as Map
 import Data.Semigroup
+import Data.Either
 import Data.String
 import Data.Traversable
 import Graphics.Vty as Vty
 
-import Source.Client.Render.Layout
 import Source.Identifier
-import Source.Layout
 import Source.Model
-import Source.Util
 import Source.Value
+import Source.Util
 
-newtype ActiveZone = ActiveZone NodeId
-
-data Rendered =
-  RenderedEmpty |
-  RenderedString Vty.Attr String |
-  RenderedActiveZone ActiveZone
-
-renderedToEither :: Rendered -> Either ActiveZone Vty.Image
-renderedToEither = \case
-  RenderedEmpty -> Right emptyImage
-  RenderedString attr str -> Right (string attr str)
-  RenderedActiveZone activeZone -> Left activeZone
-
-renderedBox :: Rendered -> Box Int Int
-renderedBox = \case
-  RenderedEmpty -> imageBox emptyImage
-  RenderedString attr str -> imageBox (string attr str)
-  RenderedActiveZone _ -> error "Active zone has no inherent size"
-
-instance IsString Rendered where
-  fromString = RenderedString defAttr
-
-renderValue ::
-  (Num x, Num y, Ord x, Ord y) =>
-  Value ->
-  Layout x y Rendered
-renderValue = \case
-  ValueInteger n ->
-    layoutString (defAttr `withForeColor` blue) $ show @Integer n
-  ValueChar c ->
-    layoutString (defAttr `withForeColor` yellow) $ show @Char c
-  ValueList vs ->
-    let
-      img = case nonEmpty vs of
-        Nothing -> "[]"
-        Just vs' -> List.foldr1 layoutHorizontalTop [
-          "[",
-          List.foldr1 layoutHorizontalTop $
-            NonEmpty.intersperse "; " (renderValue <$> vs'),
-          "]" ]
-      strVal = do
-        for vs $ \case
-          ValueChar c -> Just c
-          _           -> Nothing
-    in
-      case strVal of
-        Just cs | not (List.null cs) ->
-          layoutString (defAttr `withForeColor` red) $ show @String cs
-        _ -> img
-
-renderIdentifier :: Identifier -> Layout x y Rendered
-renderIdentifier =
-  layoutString (defAttr `withStyle` bold) .
-    nameToString . identifierToName
-
-distribExcess :: Integral n => n -> n -> (n, n)
-distribExcess desired actual = (left, right)
-  where
-    excess = max 0 (desired - actual)
-    left   = excess `quot` 2
-    right  = excess - left
+import Slay.Vty as Slay
+import Slay.Combinators
 
 newtype EnableIdentifiersResolution = EnableIdentifiersResolution Bool
 
-data NodeInfo = NodeInfo NodeId Node (PerDirection [Edge])
+data ActiveZone =
+  ActiveZone
+    { activeZoneNodeId :: NodeId,
+      activeZoneExtents :: Extents }
 
-nodesToposort :: Nodes -> Edges -> [NodeInfo]
-nodesToposort nodes edges = toposort $ do
-  (nodeId, node) <- Map.toList (nodes ^. _Nodes)
-  let
-    nodeEdges = edgesNodeEdges nodeId edges
-    nodeInfo = NodeInfo nodeId node nodeEdges
-    targetNodeIds = view edgeTarget <$> view atOutward nodeEdges
-  return (nodeInfo, nodeId, targetNodeIds)
+data Rendered =
+  RenderedPrim Prim |
+  RenderedActiveZone ActiveZone
+
+instance IsString Rendered where
+  fromString = RenderedPrim . fromString
+
+instance Inj Prim Rendered where
+  inj = RenderedPrim
+
+renderedToEither :: View Rendered (Either ActiveZone Vty.Image)
+renderedToEither = \case
+  RenderedPrim p -> (primExtents p, Right (primImage p))
+  RenderedActiveZone az -> (activeZoneExtents az, Left az)
 
 renderModel
   :: EnableIdentifiersResolution
   -> Maybe Vty.Event
   -> Model
-  -> (Vty.Picture, (Int, Int) -> Maybe NodeId)
+  -> (Vty.Picture, Offset -> Maybe NodeId)
 renderModel
   enableIdentifiersResolution
   mLastEvent
@@ -108,53 +58,32 @@ renderModel
     pic = renderImageElements imageElements
     ptrNodeId = pointerSelectNodeId activeZoneElements
     (activeZoneElements, imageElements) =
-      elementsPartition .
-      fmap (over elementObject renderedToEither) .
-      collageElements .
-      layoutCollage renderedBox $
-      rView
-    rView = layoutVerticalLeft rLastEvent rNodes
+      partitionEithers .
+      fmap bistrength .
+      NonEmpty.toList $
+      collageElements renderedToEither rView
+    rView, rLastEvent, rNodes :: s -/ Rendered => Collage s
+    rView = vertLeft rLastEvent rNodes
     rLastEvent =
       case mLastEvent of
-        Nothing -> layoutSingleton RenderedEmpty
+        Nothing -> Slay.empty
         Just lastEvent -> fromString (show lastEvent)
-    rNodes = List.foldr layoutVerticalLeft (layoutSingleton RenderedEmpty) $
+    rNodes = List.foldr vertLeft Slay.empty $
       renderNode enableIdentifiersResolution nodes <$>
         nodesToposort nodes edges
 
-layoutActivate ::
-  (Ord x, Ord y) =>
-  ActiveZone ->
-  Layout x y Rendered ->
-  Layout x y Rendered
-layoutActivate activeZone layout = Layout $ \getBox ->
-  let
-    box = collageBox collage
-    collage = layoutCollage getBox layout
-  in
-    collageSuperimpose
-      (collageElement box (RenderedActiveZone activeZone))
-      collage
+listLength :: [a] -> Unsigned
+listLength = unsafeToUnsigned . List.length
 
-pointerSelectNodeId ::
-  (Ord x, Ord y) =>
-  [Element x y ActiveZone] ->
-  (x, y) ->
-  Maybe NodeId
-pointerSelectNodeId activeZones (x, y) =
-  List.find inBounds activeZones <&> \el ->
-    case el ^. elementObject of ActiveZone nodeId -> nodeId
-  where
-    inBounds el = boxInside (el ^. elementBox) (Point x y)
-
-layoutString :: Attr -> String -> Layout x y Rendered
-layoutString attr s = layoutSingleton (RenderedString attr s)
+listReplicate :: Unsigned -> a -> [a]
+listReplicate = List.replicate . toSigned
 
 renderNode ::
+  s -/ Rendered =>
   EnableIdentifiersResolution ->
   Nodes ->
   NodeInfo ->
-  Layout Int Int Rendered
+  Collage s
 renderNode
   (EnableIdentifiersResolution enableIdentifiersResolution)
   nodes
@@ -163,8 +92,7 @@ renderNode
   where
     NodeInfo nodeId node edges = nodeInfo
     PerDirection outwardEdges inwardEdges = edges
-    activeZone = ActiveZone nodeId
-    rNode = Layout $ \getBox ->
+    rNode =
       let
         rNodeId = renderIdentifier (nodeId ^. _NodeId)
         rNodeValue = renderValue (node ^. nodeValue)
@@ -179,17 +107,17 @@ renderNode
             rSourceNodeId = renderNodeReference (edge ^. edgeSource)
             rEdgeValue = renderValue $ edge ^. edgeValue
             rEdgeValueWidth =
-              layoutWidth getBox rEdgeValue +
-              layoutWidth getBox rSourceNodeId
+              collageWidth rEdgeValue +
+              collageWidth rSourceNodeId
             (padLeftWidth, padRightWidth) =
-              distribExcess maxREdgeValueWidth rEdgeValueWidth
+              integralDistribExcess maxREdgeValueWidth rEdgeValueWidth
             rEdgeValueWidth' = (Option . Just . Max) rEdgeValueWidth
-            rEdge = List.foldr1 layoutHorizontalTop [
+            rEdge = List.foldr1 horizTop [
               rSourceNodeId,
               " ──",
-              fromString (List.replicate padLeftWidth '─'),
+              fromString (listReplicate padLeftWidth '─'),
               rEdgeValue,
-              fromString (List.replicate padRightWidth '─'),
+              fromString (listReplicate padRightWidth '─'),
               "──┤" ]
           in
             (rEdgeValueWidth', rEdge)
@@ -197,15 +125,15 @@ renderNode
           let
             rTargetNodeId = renderNodeReference (edge ^. edgeTarget)
             rEdgeValue = renderValue $ edge ^. edgeValue
-            rEdgeValueWidth = layoutWidth getBox rEdgeValue
+            rEdgeValueWidth = collageWidth rEdgeValue
             (padLeftWidth, padRightWidth) =
-              distribExcess maxREdgeValueWidth rEdgeValueWidth
+              integralDistribExcess maxREdgeValueWidth rEdgeValueWidth
             rEdgeValueWidth' = (Option . Just . Max) rEdgeValueWidth
-            rEdge = List.foldr1 layoutHorizontalTop [
+            rEdge = List.foldr1 horizTop [
               "├──",
-              fromString (List.replicate padLeftWidth '─'),
+              fromString (listReplicate padLeftWidth '─'),
               rEdgeValue,
-              fromString (List.replicate padRightWidth '─'),
+              fromString (listReplicate padRightWidth '─'),
               "── ",
               rTargetNodeId ]
           in
@@ -223,67 +151,97 @@ renderNode
               sequenceA $ renderInwardEdge maxREdgeValueWidth' <$>
                 inwardEdges
             maxREdgeValueWidth' = option 0 getMax maxREdgeValueWidth
-        rNodeDef = List.foldr1 layoutHorizontalTop [
+        rNodeDef = List.foldr1 horizTop [
           " ",
           if enableIdentifiersResolution
             then rNodeValue
-            else List.foldr1 layoutHorizontalTop [rNodeId, ": ", rNodeValue ],
+            else List.foldr1 horizTop [rNodeId, ": ", rNodeValue ],
           " " ]
         rBlockHeight =
-          List.length rNodeInwardEdges `max`
-          List.length rNodeOutwardEdges `max`
-          layoutHeight getBox rNodeDef
+          listLength rNodeInwardEdges `max`
+          listLength rNodeOutwardEdges `max`
+          collageHeight rNodeDef
         (rInwardTopPad, rInwardBottomPad) =
-          distribExcess rBlockHeight (List.length rNodeInwardEdges)
+          integralDistribExcess rBlockHeight (listLength rNodeInwardEdges)
         (rOutwardTopPad, rOutwardBottomPad) =
-          distribExcess rBlockHeight (List.length rNodeOutwardEdges)
+          integralDistribExcess rBlockHeight (listLength rNodeOutwardEdges)
         (rNodeDefTopPad, rNodeDefBottomPad) =
-          distribExcess rBlockHeight (layoutHeight getBox rNodeDef)
-        rBlock = List.foldr1 layoutHorizontalTop [
-          List.foldr1 layoutVerticalRight $
+          integralDistribExcess rBlockHeight (collageHeight rNodeDef)
+        rBlock = List.foldr1 horizTop [
+          List.foldr1 vertRight $
             List.concat [
               ["┌"],
-              List.replicate rInwardTopPad rEmptyEdge,
+              listReplicate rInwardTopPad rEmptyEdge,
               rNodeInwardEdges,
-              List.replicate rInwardBottomPad rEmptyEdge,
+              listReplicate rInwardBottomPad rEmptyEdge,
               ["└"] ],
-          List.foldr1 layoutVerticalLeft [
+          List.foldr1 vertLeft [
             fromString $
-              List.replicate (layoutWidth getBox rNodeDef) '─',
-            layoutActivate activeZone $
-            layoutPadTop rNodeDefTopPad $
-            layoutPadBottom rNodeDefBottomPad $
+              listReplicate (collageWidth rNodeDef) '─',
+            substrate (LRTB 0 0 rNodeDefTopPad rNodeDefBottomPad) (RenderedActiveZone . ActiveZone nodeId) $
               rNodeDef,
             fromString $
-              List.replicate (layoutWidth getBox rNodeDef) '─' ],
-          List.foldr1 layoutVerticalLeft $
+              listReplicate (collageWidth rNodeDef) '─' ],
+          List.foldr1 vertLeft $
             List.concat [
               ["┐"],
-              List.replicate rOutwardTopPad rEmptyEdge,
+              listReplicate rOutwardTopPad rEmptyEdge,
               rNodeOutwardEdges,
-              List.replicate rOutwardBottomPad rEmptyEdge,
+              listReplicate rOutwardBottomPad rEmptyEdge,
               ["┘"] ] ]
       in
-        layoutCollage getBox rBlock
+        rBlock
 
+renderValue ::
+  s -/ Rendered =>
+  Value ->
+  Collage s
+renderValue = \case
+  ValueInteger n ->
+    Slay.string (defAttr `withForeColor` blue) $ show @Integer n
+  ValueChar c ->
+    Slay.string (defAttr `withForeColor` yellow) $ show @Char c
+  ValueList vs ->
+    let
+      img = case nonEmpty vs of
+        Nothing -> "[]"
+        Just vs' -> List.foldr1 horizTop [
+          "[",
+          List.foldr1 horizTop $
+            NonEmpty.intersperse "; " (renderValue <$> vs'),
+          "]" ]
+      strVal = do
+        for vs $ \case
+          ValueChar c -> Just c
+          _           -> Nothing
+    in
+      case strVal of
+        Just cs | not (List.null cs) ->
+          Slay.string (defAttr `withForeColor` red) $ show @String cs
+        _ -> img
 
-{-
-newtype XPos = XPos Int
-  deriving (Eq, Ord, Show)
+renderIdentifier :: s -/ Rendered => Identifier -> Collage s
+renderIdentifier =
+  Slay.string (defAttr `withStyle` bold) .
+    nameToString . identifierToName
 
-newtype YPos = YPos Int
-  deriving (Eq, Ord, Show)
+pointerSelectNodeId ::
+  [(Offset, ActiveZone)] ->
+  Offset ->
+  Maybe NodeId
+pointerSelectNodeId activeZones point =
+  activeZoneNodeId . snd <$> List.find inBounds activeZones
+  where
+    inBounds (offset, az) =
+      insideBox (offset, activeZoneExtents az) point
 
-data Position = Position
-  { _positionX :: XPos
-  , _positionY :: YPos
-  } deriving (Eq, Ord, Show)
+data NodeInfo = NodeInfo NodeId Node (PerDirection [Edge])
 
-newtype LineNumber = LineNumber Int
-
-type PointerNodesMap = Position -> Maybe NodeId
-
-type CursorNodesMap = (LineNumber, YPos) -> Maybe NodeId
-
-type PositionNodesMap = NodeId -> (XPos, YPos, Maybe NodeId, Maybe NodeId)
--}
+nodesToposort :: Nodes -> Edges -> [NodeInfo]
+nodesToposort nodes edges = toposort $ do
+  (nodeId, node) <- Map.toList (nodes ^. _Nodes)
+  let
+    nodeEdges = edgesNodeEdges nodeId edges
+    nodeInfo = NodeInfo nodeId node nodeEdges
+    targetNodeIds = view edgeTarget <$> view atOutward nodeEdges
+  return (nodeInfo, nodeId, targetNodeIds)
