@@ -8,6 +8,7 @@ module Source.Util
   , listLookup
   , unit
   , maybeThrowError
+  , bistrength
   ) where
 
 import Control.Monad.State
@@ -17,6 +18,7 @@ import Data.EnumMap.Strict as EnumMapS
 import Data.Graph (stronglyConnComp, flattenSCCs)
 import Data.IORef
 import Data.Maybe
+import Data.Bifunctor
 import Data.Serialize as Cereal
 import Data.Tuple
 import Numeric.Natural
@@ -52,3 +54,10 @@ unit = const
 
 maybeThrowError :: MonadError e m => e -> Maybe a -> m a
 maybeThrowError e = maybe (throwError e) pure
+
+bistrength ::
+  Bifunctor f =>
+  (o, f a b) ->
+  f (o, a) (o, b)
+bistrength (o, e) =
+  bimap (o,) (o,) e

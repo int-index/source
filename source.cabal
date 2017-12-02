@@ -17,7 +17,6 @@ library
                        Source.Language.Core.Lexer
                        Source.Language.Core.Parser
                        Source.Language.Core.Eval
-                       Source.Layout
                        Source.User
                        Source.Util
 
@@ -121,11 +120,12 @@ executable source-client
 
   other-modules:       Source.Client
                        Source.Client.Render
-                       Source.Client.Render.Layout
                        Source.Client.State
 
   build-depends:       base, source, containers, enummapset-th, mtl, lens, vty == 5.18,
-                       network
+                       network, slay-core, slay-combinators, slay-number-int, slay-vty
+
+  mixins:              slay-number-int (Slay.Number.Int as Slay.Number)
 
   default-language:    Haskell2010
   default-extensions:  BangPatterns

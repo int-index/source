@@ -1,2 +1,6 @@
 packages:
   source.cabal
+  submodules/slay/number-int
+  submodules/slay/core
+  submodules/slay/combinators
+  submodules/slay/vty
