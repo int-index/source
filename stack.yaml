@@ -1,7 +1,0 @@
-packages:
-- '.'
-resolver: nightly-2017-12-01
-extra-deps:
-- enummapset-th-0.6.1.1
-- vty-5.18
-- terminfo-0.4.1.0
