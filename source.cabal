@@ -1,7 +1,7 @@
+cabal-version:       2.1
 name:                source
 version:             0.1.0.0
 build-type:          Simple
-cabal-version:       >=1.10
 
 library
 

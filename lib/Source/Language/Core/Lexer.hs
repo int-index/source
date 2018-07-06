@@ -22,7 +22,7 @@ module Source.Language.Core.Lexer
   , detokenize
   ) where
 
-import Control.Applicative as A
+import Control.Applicative as A hiding (many, some)
 import Control.Lens
 import Control.Monad
 import Data.Functor
