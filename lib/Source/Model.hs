@@ -62,9 +62,11 @@ instance Applicative PerDirection where
   PerDirection f g <*> PerDirection a b =
     PerDirection (f a) (g b)
 
+instance Semigroup a => Semigroup (PerDirection a) where
+  (<>) = liftA2 (<>)
+
 instance Monoid a => Monoid (PerDirection a) where
   mempty = pure mempty
-  mappend = liftA2 mappend
 
 instance Serialize a => Serialize (PerDirection a)
 

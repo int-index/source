@@ -5,6 +5,7 @@ module Source.Client.Render
   ) where
 
 import Control.Lens
+import Numeric.Natural
 import Data.List as List
 import Data.List.NonEmpty as NonEmpty
 import Data.Map as Map
@@ -19,6 +20,7 @@ import Source.Model
 import Source.Value
 import Source.Util
 
+import Inj
 import Slay.Vty as Slay
 import Slay.Combinators
 
@@ -59,7 +61,7 @@ renderModel
     ptrNodeId = pointerSelectNodeId activeZoneElements
     (activeZoneElements, imageElements) =
       partitionEithers .
-      fmap bistrength .
+      fmap (bistrength . (\(o, _, a) -> (o, a))) .
       NonEmpty.toList $
       collageElements renderedToEither rView
     rView, rLastEvent, rNodes :: s -/ Rendered => Collage s
@@ -72,11 +74,11 @@ renderModel
       renderNode enableIdentifiersResolution nodes <$>
         nodesToposort nodes edges
 
-listLength :: [a] -> Unsigned
-listLength = unsafeToUnsigned . List.length
+listLength :: [a] -> Natural
+listLength = fromIntegral . List.length
 
-listReplicate :: Unsigned -> a -> [a]
-listReplicate = List.replicate . toSigned
+listReplicate :: Natural -> a -> [a]
+listReplicate = List.replicate . fromIntegral
 
 renderNode ::
   s -/ Rendered =>

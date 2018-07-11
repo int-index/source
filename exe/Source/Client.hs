@@ -91,7 +91,7 @@ updateCursor ::
 updateCursor (x, y) updCur clientState = do
   clientState ^. clientStateCursorId <&> \cursorId ->
     let
-      point = Offset x y
+      point = Offset (toInteger x) (toInteger y)
       mOldCursor = modelCursorLookup cursorId (clientState ^. clientStateModel)
       defaultCursor = Map.empty
       baseCursor = fromMaybe defaultCursor mOldCursor

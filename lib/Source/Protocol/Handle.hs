@@ -9,7 +9,6 @@ import System.IO
 import Data.ByteString as ByteString
 import Data.Word
 import Data.Serialize as Cereal
-import Data.Monoid
 import Control.Exception (Exception, throw, throwIO, assert)
 import Data.Coerce
 

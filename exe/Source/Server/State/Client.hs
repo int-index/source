@@ -25,7 +25,7 @@ import Control.Lens
 import Control.Monad.State
 import Control.Exception
 import Data.Coerce
-import Data.EnumMap.Strict as EnumMapS
+import Data.Map.Strict as MapS
 import Data.Foldable
 import Data.Maybe
 import Control.Exception (assert)
@@ -47,7 +47,7 @@ makeLenses ''Client
 
 -- Client identifiers are not reused.
 newtype ClientId = ClientId Int
-  deriving (Enum)
+  deriving (Enum, Eq, Ord)
 
 instance Bounded ClientId where
   minBound = ClientId 0
@@ -58,13 +58,13 @@ instance Show ClientId where
 
 data Clients = Clients
   { _clientsFreeClientId :: ClientId
-  , _clientsClients :: EnumMapS ClientId Client
+  , _clientsClients :: MapS.Map ClientId Client
   } deriving ()
 
 makeLenses ''Clients
 
 clientsEmpty :: Clients
-clientsEmpty = Clients minBound EnumMapS.empty
+clientsEmpty = Clients minBound MapS.empty
 
 -- | Return the current free identifier and update the stored one.
 clientsNewClientId :: State Clients ClientId
@@ -75,26 +75,26 @@ clientsRegister client = do
   clientId <- clientsNewClientId
   isAvailableClientId <-
     uses clientsClients $
-      EnumMapS.notMember clientId
+      MapS.notMember clientId
   assert isAvailableClientId $ do
-    clientsClients %= EnumMapS.insert clientId client
+    clientsClients %= MapS.insert clientId client
     return clientId
 
 clientsUnregister :: ClientId -> State Clients ()
 clientsUnregister clientId = do
   isRegisteredClientId <-
     uses clientsClients $
-      EnumMapS.member clientId
+      MapS.member clientId
   assert isRegisteredClientId $ do
-    clientsClients %= EnumMapS.delete clientId
+    clientsClients %= MapS.delete clientId
 
 clientsAssignCursor :: ClientId -> NodeId -> State Clients ()
 clientsAssignCursor clientId cursorId = do
   isRegisteredClientId <-
     uses clientsClients $
-      EnumMapS.member clientId
+      MapS.member clientId
   assert isRegisteredClientId $ do
-    clientsClients %= EnumMapS.alter
+    clientsClients %= MapS.alter
       (_Just . clientCursorId .~ Just cursorId)
       clientId
 
@@ -107,7 +107,7 @@ clientsGet :: ClientId -> Clients -> Client
 clientsGet clientId clients =
   fromMaybe (throw $ ClientNotRegistered clientId) mClient
   where
-    mClient = EnumMapS.lookup clientId $
+    mClient = MapS.lookup clientId $
       clients ^. clientsClients
 
 forClients
@@ -117,4 +117,4 @@ forClients
   -> f ()
 forClients clients f =
   traverse_ (uncurry f) $
-    EnumMapS.toAscList (clients ^. clientsClients)
+    MapS.toAscList (clients ^. clientsClients)

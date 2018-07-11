@@ -21,7 +21,7 @@ library
                        Source.Util
 
   build-depends:       base, text, bytestring, cereal, containers,
-                       enummapset-th, mtl, lens, Earley, megaparsec,
+                       mtl, lens, Earley, megaparsec,
                        QuickCheck, generic-arbitrary, constraints
 
   default-language:    Haskell2010
@@ -72,7 +72,7 @@ executable source-server
                        Source.Server.State
                        Source.Server.State.Client
 
-  build-depends:       base, source, mtl, lens, containers, enummapset-th,
+  build-depends:       base, source, mtl, lens, containers,
                        network, pretty-show
 
   default-language:    Haskell2010
@@ -122,10 +122,8 @@ executable source-client
                        Source.Client.Render
                        Source.Client.State
 
-  build-depends:       base, source, containers, enummapset-th, mtl, lens, vty == 5.18,
-                       network, slay-core, slay-combinators, slay-number-int, slay-vty
-
-  mixins:              slay-number-int (Slay.Number.Int as Slay.Number)
+  build-depends:       base, source, containers, mtl, lens, vty == 5.21,
+                       network, inj, slay-core, slay-combinators, slay-vty
 
   default-language:    Haskell2010
   default-extensions:  BangPatterns

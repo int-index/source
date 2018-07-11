@@ -28,7 +28,6 @@ import Control.Monad
 import Data.Functor
 import Data.List as List
 import Data.Maybe
-import Data.Monoid
 import Data.Text as Text
 import Data.Text.Lens
 import Data.Void
