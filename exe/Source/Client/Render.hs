@@ -4,13 +4,14 @@ module Source.Client.Render
     ActiveZone(..)
   ) where
 
+import Control.Applicative as A
 import Control.Lens
 import Numeric.Natural
 import Data.List as List
+import Data.DList as DList
 import Data.List.NonEmpty as NonEmpty
 import Data.Map as Map
 import Data.Semigroup
-import Data.Either
 import Data.String
 import Data.Traversable
 import Graphics.Vty as Vty
@@ -51,12 +52,6 @@ instance Inj Prim Rendered where
 instance Inj ActiveZone Rendered where
   inj = RenderedActiveZone
 
-renderedToEither :: Positioned Rendered -> Either (Positioned ActiveZone) (Positioned Vty.Image)
-renderedToEither (At o r) =
-  case r of
-    RenderedPrim p -> Right (At o (primImage p))
-    RenderedActiveZone az -> Left (At o az)
-
 renderModel
   :: EnableIdentifiersResolution
   -> Maybe Vty.Event
@@ -68,15 +63,9 @@ renderModel
   (Model nodes edges) =
     (pic, ptrNodeId)
   where
-    pic = renderImageElements imageElements
-    ptrNodeId = pointerSelectNodeId activeZoneElements
-
-    allElements :: [Positioned Rendered]
-    activeZoneElements :: [Positioned ActiveZone]
-    imageElements :: [Positioned Vty.Image]
-    (activeZoneElements, imageElements) =
-      partitionEithers (List.map renderedToEither allElements)
-    allElements = NonEmpty.toList (collageElements offsetZero rView)
+    pic = renderImageElements (DList.toList imageElements)
+    (FindNodeId ptrNodeId, imageElements) =
+      foldMapCollage renderedToAccum offsetZero rView
 
     rView, rLastEvent, rNodes :: Collage Rendered
     rView = vertLeft rLastEvent rNodes
@@ -240,16 +229,29 @@ renderIdentifier =
   Slay.string (defAttr `withStyle` bold) .
     nameToString . identifierToName
 
-pointerSelectNodeId ::
-  [Positioned ActiveZone] ->
-  Offset ->
-  Maybe NodeId
-pointerSelectNodeId activeZones point =
-  activeZoneNodeId . positionedItem <$>
-    List.find inBounds activeZones
-  where
-    inBounds (At offset az) =
-      insideBox (offset, activeZoneExtents az) point
+newtype FindNodeId = FindNodeId (Offset -> Maybe NodeId)
+
+instance Semigroup FindNodeId where
+  FindNodeId f1 <> FindNodeId f2 =
+    FindNodeId $ \point -> f1 point A.<|> f2 point
+
+instance Monoid FindNodeId where
+  mempty = FindNodeId (const Nothing)
+
+findInActiveZone :: Offset -> ActiveZone -> FindNodeId
+findInActiveZone offset az =
+  FindNodeId $ \point ->
+    if insideBox (offset, activeZoneExtents az) point
+    then Just (activeZoneNodeId az)
+    else Nothing
+
+type VtyImages = DList (Positioned Vty.Image)
+
+renderedToAccum :: Positioned Rendered -> (FindNodeId, VtyImages)
+renderedToAccum (At o r) =
+  case r of
+    RenderedPrim p -> (mempty, DList.singleton (At o (primImage p)))
+    RenderedActiveZone az -> (findInActiveZone o az, mempty)
 
 data NodeInfo = NodeInfo NodeId Node (PerDirection [Edge])
 
