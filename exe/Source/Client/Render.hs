@@ -35,16 +35,27 @@ data Rendered =
   RenderedPrim Prim |
   RenderedActiveZone ActiveZone
 
+instance HasExtents Rendered where
+  extentsOf (RenderedPrim p) = primExtents p
+  extentsOf (RenderedActiveZone az) = activeZoneExtents az
+
+instance HasBaseline Rendered where
+  baselineOf _ = NoBaseline
+
 instance IsString Rendered where
   fromString = RenderedPrim . fromString
 
 instance Inj Prim Rendered where
   inj = RenderedPrim
 
-renderedToEither :: View Rendered (Either ActiveZone Vty.Image)
-renderedToEither = \case
-  RenderedPrim p -> (primExtents p, Right (primImage p))
-  RenderedActiveZone az -> (activeZoneExtents az, Left az)
+instance Inj ActiveZone Rendered where
+  inj = RenderedActiveZone
+
+renderedToEither :: Positioned Rendered -> Either (Positioned ActiveZone) (Positioned Vty.Image)
+renderedToEither (At o r) =
+  case r of
+    RenderedPrim p -> Right (At o (primImage p))
+    RenderedActiveZone az -> Left (At o az)
 
 renderModel
   :: EnableIdentifiersResolution
@@ -59,12 +70,15 @@ renderModel
   where
     pic = renderImageElements imageElements
     ptrNodeId = pointerSelectNodeId activeZoneElements
+
+    allElements :: [Positioned Rendered]
+    activeZoneElements :: [Positioned ActiveZone]
+    imageElements :: [Positioned Vty.Image]
     (activeZoneElements, imageElements) =
-      partitionEithers .
-      fmap (bistrength . (\(o, _, a) -> (o, a))) .
-      NonEmpty.toList $
-      collageElements renderedToEither rView
-    rView, rLastEvent, rNodes :: s -/ Rendered => Collage s
+      partitionEithers (List.map renderedToEither allElements)
+    allElements = NonEmpty.toList (collageElements offsetZero rView)
+
+    rView, rLastEvent, rNodes :: Collage Rendered
     rView = vertLeft rLastEvent rNodes
     rLastEvent =
       case mLastEvent of
@@ -81,11 +95,10 @@ listReplicate :: Natural -> a -> [a]
 listReplicate = List.replicate . fromIntegral
 
 renderNode ::
-  s -/ Rendered =>
   EnableIdentifiersResolution ->
   Nodes ->
   NodeInfo ->
-  Collage s
+  Collage Rendered
 renderNode
   (EnableIdentifiersResolution enableIdentifiersResolution)
   nodes
@@ -180,7 +193,8 @@ renderNode
           List.foldr1 vertLeft [
             fromString $
               listReplicate (collageWidth rNodeDef) '─',
-            substrate (LRTB 0 0 rNodeDefTopPad rNodeDefBottomPad) (RenderedActiveZone . ActiveZone nodeId) $
+            substrate (LRTB 0 0 rNodeDefTopPad rNodeDefBottomPad)
+                      (\e -> inj (ActiveZone nodeId e)) $
               rNodeDef,
             fromString $
               listReplicate (collageWidth rNodeDef) '─' ],
@@ -195,9 +209,8 @@ renderNode
         rBlock
 
 renderValue ::
-  s -/ Rendered =>
   Value ->
-  Collage s
+  Collage Rendered
 renderValue = \case
   ValueInteger n ->
     Slay.string (defAttr `withForeColor` blue) $ show @Integer n
@@ -222,19 +235,20 @@ renderValue = \case
           Slay.string (defAttr `withForeColor` red) $ show @String cs
         _ -> img
 
-renderIdentifier :: s -/ Rendered => Identifier -> Collage s
+renderIdentifier :: Identifier -> Collage Rendered
 renderIdentifier =
   Slay.string (defAttr `withStyle` bold) .
     nameToString . identifierToName
 
 pointerSelectNodeId ::
-  [(Offset, ActiveZone)] ->
+  [Positioned ActiveZone] ->
   Offset ->
   Maybe NodeId
 pointerSelectNodeId activeZones point =
-  activeZoneNodeId . snd <$> List.find inBounds activeZones
+  activeZoneNodeId . positionedItem <$>
+    List.find inBounds activeZones
   where
-    inBounds (offset, az) =
+    inBounds (At offset az) =
       insideBox (offset, activeZoneExtents az) point
 
 data NodeInfo = NodeInfo NodeId Node (PerDirection [Edge])

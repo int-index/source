@@ -6,7 +6,6 @@ module Source.Util
   , listLookup
   , unit
   , maybeThrowError
-  , bistrength
   ) where
 
 import Control.Monad.State
@@ -14,7 +13,6 @@ import Control.Monad.Except
 import Data.Graph (stronglyConnComp, flattenSCCs)
 import Data.IORef
 import Data.Maybe
-import Data.Bifunctor
 import Data.Tuple
 import Numeric.Natural
 import Test.QuickCheck as QC
@@ -40,10 +38,3 @@ unit = const
 
 maybeThrowError :: MonadError e m => e -> Maybe a -> m a
 maybeThrowError e = maybe (throwError e) pure
-
-bistrength ::
-  Bifunctor f =>
-  (o, f a b) ->
-  f (o, a) (o, b)
-bistrength (o, e) =
-  bimap (o,) (o,) e

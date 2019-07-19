@@ -125,7 +125,7 @@ pToken :: Lexer Token
 pToken = (try pToken' <|> pUnknown) <* pSkip
 
 pUnknown :: Lexer Token
-pUnknown = TokenUnknown . UnknownChar <$> anyChar
+pUnknown = TokenUnknown . UnknownChar <$> anySingle
 
 pSkip :: Lexer ()
 pSkip = skipMany (void spaceChar <|> pComment)
@@ -196,14 +196,14 @@ pVar = char '^' *> do
 pString :: Lexer String
 pString =
   char '\"' *>
-  manyTill (charLiteral <|> anyChar) (closing (char '\"'))
+  manyTill (charLiteral <|> anySingle) (closing (char '\"'))
 
 pChar :: Lexer Char
-pChar = between (char '\'') (closing (char '\'')) (charLiteral <|> anyChar)
+pChar = between (char '\'') (closing (char '\'')) (charLiteral <|> anySingle)
 
 pComment :: Lexer ()
 pComment = void comment <?> "comment"
   where
-    comment = open *> manyTill anyChar close
+    comment = open *> manyTill anySingle close
     open    = void (string "{-")
     close   = closing (string "-}")

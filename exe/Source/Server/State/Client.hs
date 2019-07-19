@@ -32,7 +32,6 @@ import Control.Exception (assert)
 
 import Source.Protocol (ServerMessage)
 import Source.Model
-import Source.Util
 
 -- Information about a connected client.
 data Client = Client

@@ -3,7 +3,6 @@ module Source.Server
   ) where
 
 import Data.IORef
-import Data.Monoid
 import System.IO as Sys
 import Network
 import Control.Monad

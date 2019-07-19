@@ -1,5 +1,20 @@
 packages:
   source.cabal
-  submodules/slay/core
-  submodules/slay/combinators
-  submodules/slay/vty
+
+source-repository-package
+  type: git
+  location: https://github.com/int-index/slay
+  tag: 7311fda6cb4dbe553dd8b8240960faadb9904b08
+  subdir: core
+
+source-repository-package
+  type: git
+  location: https://github.com/int-index/slay
+  tag: 7311fda6cb4dbe553dd8b8240960faadb9904b08
+  subdir: combinators
+
+source-repository-package
+  type: git
+  location: https://github.com/int-index/slay
+  tag: 7311fda6cb4dbe553dd8b8240960faadb9904b08
+  subdir: vty
